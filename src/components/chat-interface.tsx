@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageRole } from "@/generated/prisma/client";
+import { ViatorActivitySearch } from "@/components/viator-activity-search";
 
 interface Message {
   id: string;
@@ -15,6 +16,9 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string>("default");
+  const [activityQuery, setActivityQuery] = useState("");
+  const [historyError, setHistoryError] = useState("");
+  const [sendError, setSendError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -25,24 +29,38 @@ export function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // Load chat history
   useEffect(() => {
-    loadChatHistory();
-  }, [conversationId]);
-
-  const loadChatHistory = async () => {
-    try {
-      const response = await fetch(
-        `/api/chat?id=${conversationId}`
-      );
-      const data = await response.json();
-      if (data.success) {
-        setMessages(data.messages);
+    let cancelled = false;
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch(`/api/chat?id=${conversationId}`);
+        const data = (await response.json()) as {
+          success?: boolean;
+          messages?: Message[];
+          error?: string;
+        };
+        if (!response.ok || !data.success || !Array.isArray(data.messages)) {
+          throw new Error(data.error || "Failed to fetch chat history.");
+        }
+        if (!cancelled) {
+          setMessages(data.messages);
+          setHistoryError("");
+        }
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+        if (!cancelled) {
+          setHistoryError(
+            "Saved chat history is unavailable. Live activity search is still available."
+          );
+        }
       }
-    } catch (error) {
-      console.error("Failed to load chat history:", error);
-    }
-  };
+    };
+
+    void loadChatHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +69,14 @@ export function ChatInterface() {
     const userMessage = input.trim();
     setInput("");
     setLoading(true);
+    setSendError("");
+    setActivityQuery(
+      /\b(price|cost|rate|activity|activities|tour|destination|trip|travel|plan|search|visit|things to do|bali|dubai|kyoto|paris|tokyo|thailand|maldives|jaipur)\b/i.test(
+        userMessage
+      )
+        ? userMessage
+        : ""
+    );
 
     try {
       // Add user message to UI immediately
@@ -72,21 +98,29 @@ export function ChatInterface() {
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        success?: boolean;
+        aiResponse?: string;
+        error?: string;
+        message?: string;
+      };
 
-      if (data.success) {
-        // Add AI response
-        const aiMsg: Message = {
-          id: `ai-${Date.now()}`,
-          role: "ASSISTANT" as MessageRole,
-          content: data.aiResponse,
-          createdAt: new Date(),
-        };
-        setMessages((prev) => [...prev, aiMsg]);
+      if (!response.ok || !data.success || typeof data.aiResponse !== "string") {
+        throw new Error(data.message || data.error || "Chat request failed.");
       }
+
+      const aiMsg: Message = {
+        id: `ai-${Date.now()}`,
+        role: "ASSISTANT" as MessageRole,
+        content: data.aiResponse,
+        createdAt: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
     } catch (error) {
       console.error("Failed to send message:", error);
-      alert("Failed to send message. Please try again.");
+      setSendError(
+        "Chat could not finish this message; it may not have been saved. Live activity search is still available."
+      );
     } finally {
       setLoading(false);
     }
@@ -100,10 +134,15 @@ export function ChatInterface() {
       </div>
 
       <div style={styles.messagesArea}>
+        {historyError && (
+          <p role="alert" style={styles.error}>
+            {historyError}
+          </p>
+        )}
         {messages.length === 0 && (
           <div style={styles.welcomeMessage}>
-            <p>👋 Welcome! I'm your travel planning assistant.</p>
-            <p>Tell me where you'd like to go, and I'll help you plan!</p>
+            <p>👋 Welcome! I&apos;m your travel planning assistant.</p>
+            <p>Tell me where you&apos;d like to go, and I&apos;ll help you plan!</p>
           </div>
         )}
 
@@ -128,6 +167,14 @@ export function ChatInterface() {
             </div>
           </div>
         ))}
+        {sendError && (
+          <p role="alert" style={styles.error}>
+            {sendError}
+          </p>
+        )}
+        {activityQuery && (
+          <ViatorActivitySearch key={activityQuery} query={activityQuery} />
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -229,5 +276,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: "600",
     fontSize: "14px",
     transition: "background-color 0.2s",
+  },
+  error: {
+    margin: 0,
+    padding: "10px 12px",
+    borderRadius: "8px",
+    backgroundColor: "#fff1ee",
+    color: "#984c3c",
+    fontSize: "13px",
   },
 };

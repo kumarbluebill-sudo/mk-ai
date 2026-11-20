@@ -28,6 +28,26 @@ Example response:
 
 The sample `startingAt` value is an illustrative planning hint, not a quote. This endpoint does not call Yatra, Klook or a destination supplier and must not be used to confirm inventory.
 
-## Planned supplier boundary
+## `GET /api/viator/activities`
 
-The application currently has no supplier API routes. Once authorized documentation and credentials exist, implement server-only adapters with `search`, `checkAvailability`, `getPricing`, `getDetails`, `createBooking`, `confirmBooking`, `cancelBooking`, `getBookingStatus` and `getVoucher`. Normalize responses to the inventory and booking models in `prisma/schema.prisma`. Persist the source, supplier reference and verification timestamp. Do not add guessed URLs or parameters.
+Searches live Viator products using Partner API v2 free-text search. `keyword` is required; `startDate` is optional and must be `YYYY-MM-DD`; `currency` defaults to `USD`.
+
+The API key is read by the server from `VIATOR_SANDBOX_KEY` or `VIATOR_PRODUCTION_KEY`, selected by `VIATOR_API_ENV`. Search prices are not final; use the availability check below for the selected travel date and traveler mix.
+
+## `POST /api/viator/pricing`
+
+Checks live Viator availability and pricing for one activity. This returns the available start times and the Viator-recommended retail price for the selected traveler mix.
+
+```json
+{
+  "activityId": "163605P4",
+  "date": "2026-12-15",
+  "adults": 2,
+  "children": 0,
+  "currency": "USD"
+}
+```
+
+Only Viator activities are priced. Hotels, flights, transfers, and complete trip totals are not included. An empty `bookableItems` array means Viator returned no bookable price for the requested date and traveler mix.
+
+Viator booking, payments and other suppliers are not implemented. Future suppliers require authorized documentation and credentials; implement server-only adapters and do not guess supplier URLs or parameters.

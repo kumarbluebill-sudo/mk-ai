@@ -6,12 +6,13 @@ MK AI Travel is the Phase 1 foundation for a conversational travel-planning plat
 
 - Responsive travel workspace with sidebar navigation, prompt composer, destination cards and destination detail view.
 - Search endpoint backed by a small editorial destination catalogue.
+- Live Viator activity search and date/traveler-specific availability and pricing checks; supplier credentials remain server-side.
 - Recent trip titles persist in the browser's local storage.
-- Destination budgets are labelled as illustrative sample ideas. Search results are marked `DEMO DATA`; there is no live hotel, flight or activity availability.
+- Editorial destination budgets are illustrative sample ideas. Hotel, flight, and transfer inventory is not live or included in Viator activity prices.
 - Prisma schema for customers, conversations, travel requirements, inventory, itinerary, quotations, bookings, payments, vouchers, company settings, markups and audit logs.
 - PWA web manifest.
 
-Supplier booking, payments, authentication, admin management, PDFs and AI responses are not wired in this foundation. Yatra and Klook require authorized supplier documentation and credentials before their live adapters can be implemented. Do not represent the sample catalogue as live supplier inventory.
+Viator search and availability/pricing checks are live in the configured Viator environment; booking, payments, authentication, admin management, PDFs and AI itinerary generation are not wired in this foundation. Yatra and Klook require authorized supplier documentation and credentials before their live adapters can be implemented. Do not represent the sample catalogue as live supplier inventory or an activity price as a complete trip quote.
 
 ## Requirements
 
@@ -49,7 +50,7 @@ src/lib/destinations.ts   Editorial demo destination catalogue
 prisma/schema.prisma      PostgreSQL domain schema
 ```
 
-The inventory models distinguish `DEMO` from supplier-confirmed `AVAILABLE` results. Future suppliers should implement a shared adapter contract under `src/integrations/<supplier>`; keep keys server-side, record the supplier response and verification timestamp, and only treat an availability result as confirmed when returned by that supplier.
+The inventory models distinguish `DEMO` from supplier-confirmed `AVAILABLE` results. Viator calls use the Partner API v2 from server-side routes; configure `VIATOR_API_ENV` as `sandbox` or `production` and set the matching `VIATOR_SANDBOX_KEY` or `VIATOR_PRODUCTION_KEY`. Keep keys server-side, record the supplier response and verification timestamp, and only treat an availability result as confirmed when returned by that supplier.
 
 ## Security and production notes
 
