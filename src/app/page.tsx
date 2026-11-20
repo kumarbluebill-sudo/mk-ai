@@ -56,13 +56,118 @@ export default function HomePage() {
     setSearching(true);
     setResults(null);
     setActive("New trip");
+
     try {
-      const response = await fetch(`/api/destinations?q=${encodeURIComponent(query)}`);
-      const data = (await response.json()) as SearchResult;
-      setResults(data.results);
+      // Check if query is conversational (contains numbers, dates, or activity keywords)
+      const isConversational = /(\d+\s*(people|adults?|kids?|children|days?|nights?)|\d{1,2}[-\/]\d{1,2}|december|january|adventure|culture|food|relaxation|private|luxury|budget)/i.test(query);
+
+      if (isConversational) {
+        // Parse conversational query and create package (using quick API - no database needed)
+        const packageData = parseConversationalQuery(query);
+        try {
+          const packageResponse = await fetch("/api/package/quick", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(packageData),
+          });
+
+          const result = await packageResponse.json();
+          if (result.success && result.package) {
+            // Display package as a special result
+            const pkg = result.package;
+            setResults([{
+              name: pkg.title,
+              slug: pkg.reference,
+              country: pkg.destination,
+              region: "Custom Package",
+              tagline: pkg.summary.travelers + " • " + pkg.summary.totalDays + " days • $" + pkg.pricing.total + " USD",
+              image: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=85",
+              startingAt: pkg.pricing.total,
+              days: pkg.summary.totalDays,
+              highlights: [pkg.summary.tripType, ...pkg.summary.activities],
+            }]);
+          } else {
+            throw new Error("Invalid response");
+          }
+        } catch (err) {
+          console.error("Package error:", err);
+          const response = await fetch(`/api/destinations?q=${encodeURIComponent(query)}`);
+          const data = (await response.json()) as SearchResult;
+          setResults(data.results);
+        }
+      } else {
+        // Regular destination search
+        const response = await fetch(`/api/destinations?q=${encodeURIComponent(query)}`);
+        const data = (await response.json()) as SearchResult;
+        setResults(data.results);
+      }
     } catch {
       setResults(destinations.filter((d) => d.name.toLowerCase().includes(query.toLowerCase())));
-    } finally { setSearching(false); }
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Helper function to parse conversational query
+  const parseConversationalQuery = (query: string) => {
+    const destinations_list = ["bali", "dubai", "kyoto", "paris", "tokyo", "thailand", "maldives"];
+    let destination = "bali";
+
+    for (const dest of destinations_list) {
+      if (query.toLowerCase().includes(dest)) {
+        destination = dest;
+        break;
+      }
+    }
+
+    const adultsMatch = query.match(/(\d+)\s*(?:adult|people|person)/i);
+    const childrenMatch = query.match(/(\d+)\s*(?:child|kid)/i);
+    const daysMatch = query.match(/(\d+)\s*days?/i);
+
+    const adults = adultsMatch ? parseInt(adultsMatch[1]) : 2;
+    const children = childrenMatch ? parseInt(childrenMatch[1]) : 0;
+    const days = daysMatch ? parseInt(daysMatch[1]) : 5;
+
+    // Determine month
+    let month = 12; // December default
+    const months: { [key: string]: number } = {
+      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+    };
+    for (const [name, num] of Object.entries(months)) {
+      if (query.toLowerCase().includes(name)) month = num;
+    }
+
+    const startDate = `2026-${String(month).padStart(2, "0")}-15`;
+    const endDate = new Date(new Date(startDate).getTime() + days * 24 * 60 * 60 * 1000)
+      .toISOString().split("T")[0];
+
+    // Determine trip type and activities
+    let tripType: "private" | "customized" | "group" = "customized";
+    if (query.toLowerCase().includes("private")) tripType = "private";
+    else if (query.toLowerCase().includes("group")) tripType = "group";
+
+    const activities = [];
+    if (query.toLowerCase().includes("adventure")) activities.push("adventure");
+    if (query.toLowerCase().includes("culture")) activities.push("culture");
+    if (query.toLowerCase().includes("food")) activities.push("food");
+    if (query.toLowerCase().includes("relax")) activities.push("relaxation");
+    if (activities.length === 0) activities.push("culture", "adventure");
+
+    let accommodation: "budget" | "midrange" | "luxury" = "midrange";
+    if (query.toLowerCase().includes("luxury")) accommodation = "luxury";
+    else if (query.toLowerCase().includes("budget")) accommodation = "budget";
+
+    return {
+      destination,
+      travelers: { adults, children },
+      startDate,
+      endDate,
+      tripType,
+      activities,
+      accommodation,
+      transport: "private",
+    };
   };
 
   const startTrip = (prompt: string) => {
