@@ -1,0 +1,450 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  AGENT
+  ADMIN
+}
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+enum SupplierType {
+  YATRA
+  KLOOK
+  OTHER
+}
+enum InventoryStatus {
+  PENDING
+  AVAILABLE
+  UNAVAILABLE
+  ERROR
+  DEMO
+}
+enum BookingStatus {
+  DRAFT
+  QUOTATION_SENT
+  AWAITING_APPROVAL
+  RECHECKING_INVENTORY
+  PAYMENT_PENDING
+  IN_PROGRESS
+  PARTIALLY_CONFIRMED
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+enum PaymentStatus {
+  CREATED
+  PENDING
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+enum ProductType {
+  HOTEL
+  FLIGHT
+  ACTIVITY
+  TRANSFER
+  TOUR
+  OTHER
+}
+enum VoucherStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String?
+  passwordHash String?
+  role UserRole @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer?
+  messages Message[]
+  auditLogs AuditLog[]
+}
+
+model Customer {
+  id String @id @default(cuid())
+  userId String @unique
+  phone String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  itineraries Itinerary[]
+  quotations Quotation[]
+  bookings Booking[]
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id String @id @default(cuid())
+  customerId String
+  title String @default("New travel search")
+  archived Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages Message[]
+  requirements TravelRequirements?
+  @@index([customerId, updatedAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  userId String?
+  role MessageRole
+  content String @db.Text
+  metadata Json?
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([conversationId, createdAt])
+}
+
+model TravelRequirements {
+  id String @id @default(cuid())
+  conversationId String @unique
+  origin String?
+  destination String?
+  startDate DateTime?
+  endDate DateTime?
+  adults Int @default(1)
+  children Int @default(0)
+  childAges Int[] @default([])
+  budget Decimal? @db.Decimal(12, 2)
+  currency String @default("INR")
+  preferences Json?
+  completeness Json?
+  updatedAt DateTime @updatedAt
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Destination {
+  id String @id @default(cuid())
+  slug String @unique
+  name String
+  country String
+  region String?
+  description String? @db.Text
+  imageUrl String?
+  published Boolean @default(false)
+  attractions Attraction[]
+  hotels Hotel[]
+  activities Activity[]
+  itineraries Itinerary[]
+}
+
+model Attraction {
+  id String @id @default(cuid())
+  destinationId String
+  name String
+  description String? @db.Text
+  address String?
+  latitude Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+  imageUrl String?
+  openingHours Json?
+  source String @default("EDITORIAL")
+  destination Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  @@index([destinationId, name])
+}
+
+model Supplier {
+  id String @id @default(cuid())
+  type SupplierType
+  name String
+  enabled Boolean @default(false)
+  demoMode Boolean @default(true)
+  config Json?
+  products SupplierProduct[]
+  credentials SupplierCredential?
+  searches InventorySearch[]
+  bookings BookingItem[]
+  markups MarkupSetting[]
+  createdAt DateTime @default(now())
+  @@unique([type, name])
+}
+
+model SupplierCredential {
+  id String @id @default(cuid())
+  supplierId String @unique
+  encryptedPayload String @db.Text
+  updatedAt DateTime @updatedAt
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model SupplierProduct {
+  id String @id @default(cuid())
+  supplierId String
+  externalId String
+  type ProductType
+  name String
+  details Json?
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  inventoryResults InventoryResult[]
+  @@unique([supplierId, externalId])
+}
+
+model InventorySearch {
+  id String @id @default(cuid())
+  supplierId String
+  query Json
+  status InventoryStatus @default(PENDING)
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  errorCode String?
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  results InventoryResult[]
+  checks AvailabilityCheck[]
+  @@index([supplierId, startedAt])
+}
+
+model InventoryResult {
+  id String @id @default(cuid())
+  searchId String
+  productId String?
+  status InventoryStatus
+  price Decimal? @db.Decimal(12, 2)
+  currency String?
+  travelDate DateTime?
+  cancellationPolicy String? @db.Text
+  verifiedAt DateTime?
+  payload Json?
+  search InventorySearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  product SupplierProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  @@index([searchId, status])
+}
+
+model AvailabilityCheck {
+  id String @id @default(cuid())
+  searchId String
+  status InventoryStatus
+  checkedAt DateTime @default(now())
+  response Json?
+  search InventorySearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+}
+
+model Hotel {
+  id String @id @default(cuid())
+  destinationId String
+  name String
+  address String?
+  starRating Int?
+  imageUrl String?
+  details Json?
+  source String @default("EDITORIAL")
+  destination Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id String @id @default(cuid())
+  destinationId String
+  name String
+  description String? @db.Text
+  imageUrl String?
+  details Json?
+  source String @default("EDITORIAL")
+  destination Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+}
+
+model Itinerary {
+  id String @id @default(cuid())
+  customerId String?
+  destinationId String?
+  title String
+  startDate DateTime?
+  endDate DateTime?
+  status String @default("DRAFT")
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  destination Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  days ItineraryDay[]
+  quotations Quotation[]
+  bookings Booking[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ItineraryDay {
+  id String @id @default(cuid())
+  itineraryId String
+  dayNumber Int
+  date DateTime?
+  title String?
+  notes String? @db.Text
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  items ItineraryItem[]
+  @@unique([itineraryId, dayNumber])
+}
+
+model ItineraryItem {
+  id String @id @default(cuid())
+  dayId String
+  title String
+  description String? @db.Text
+  startTime String?
+  endTime String?
+  location String?
+  sortOrder Int @default(0)
+  supplierName String?
+  liveStatus InventoryStatus @default(DEMO)
+  price Decimal? @db.Decimal(12, 2)
+  currency String @default("INR")
+  metadata Json?
+  day ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  quotationItems QuotationItem[]
+  bookingItems BookingItem[]
+  @@index([dayId, sortOrder])
+}
+
+model Quotation {
+  id String @id @default(cuid())
+  customerId String
+  itineraryId String?
+  reference String @unique
+  status String @default("DRAFT")
+  currency String @default("INR")
+  subtotal Decimal @default(0) @db.Decimal(12, 2)
+  markup Decimal @default(0) @db.Decimal(12, 2)
+  taxes Decimal @default(0) @db.Decimal(12, 2)
+  discount Decimal @default(0) @db.Decimal(12, 2)
+  total Decimal @default(0) @db.Decimal(12, 2)
+  validUntil DateTime?
+  customer Customer @relation(fields: [customerId], references: [id])
+  itinerary Itinerary? @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
+  items QuotationItem[]
+  createdAt DateTime @default(now())
+}
+
+model QuotationItem {
+  id String @id @default(cuid())
+  quotationId String
+  itineraryItemId String?
+  name String
+  quantity Int @default(1)
+  supplierCost Decimal? @db.Decimal(12, 2)
+  sellingPrice Decimal @db.Decimal(12, 2)
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  itineraryItem ItineraryItem? @relation(fields: [itineraryItemId], references: [id], onDelete: SetNull)
+}
+
+model Booking {
+  id String @id @default(cuid())
+  customerId String
+  itineraryId String?
+  reference String @unique
+  status BookingStatus @default(DRAFT)
+  total Decimal @default(0) @db.Decimal(12, 2)
+  currency String @default("INR")
+  idempotencyKey String? @unique
+  customer Customer @relation(fields: [customerId], references: [id])
+  itinerary Itinerary? @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
+  items BookingItem[]
+  payments Payment[]
+  vouchers Voucher[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BookingItem {
+  id String @id @default(cuid())
+  bookingId String
+  supplierId String?
+  itineraryItemId String?
+  status BookingStatus @default(DRAFT)
+  supplierReference String?
+  details Json?
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  itineraryItem ItineraryItem? @relation(fields: [itineraryItemId], references: [id], onDelete: SetNull)
+  vouchers Voucher[]
+}
+
+model Payment {
+  id String @id @default(cuid())
+  bookingId String
+  gateway String @default("RAZORPAY")
+  gatewayReference String? @unique
+  idempotencyKey String? @unique
+  status PaymentStatus @default(CREATED)
+  amount Decimal @db.Decimal(12, 2)
+  currency String @default("INR")
+  verifiedAt DateTime?
+  metadata Json?
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds Refund[]
+  createdAt DateTime @default(now())
+}
+
+model Refund {
+  id String @id @default(cuid())
+  paymentId String
+  amount Decimal @db.Decimal(12, 2)
+  status String @default("PENDING")
+  gatewayReference String?
+  reason String?
+  payment Payment @relation(fields: [paymentId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Voucher {
+  id String @id @default(cuid())
+  bookingId String
+  bookingItemId String?
+  reference String @unique
+  status VoucherStatus @default(PENDING)
+  fileUrl String?
+  payload Json?
+  issuedAt DateTime?
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingItem BookingItem? @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+}
+
+model CompanySettings {
+  id String @id @default(cuid())
+  name String @default("MK Solutions")
+  logoUrl String?
+  address String?
+  phone String?
+  email String?
+  website String?
+  gstNumber String?
+  bankDetails Json?
+  terms String? @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model MarkupSetting {
+  id String @id @default(cuid())
+  supplierId String?
+  percentage Decimal? @db.Decimal(7, 4)
+  fixedAmount Decimal? @db.Decimal(12, 2)
+  currency String @default("INR")
+  active Boolean @default(true)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  userId String?
+  action String
+  entity String
+  entityId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([entity, entityId, createdAt])
+}
