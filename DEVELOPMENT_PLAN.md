@@ -10,8 +10,8 @@
 | 6 | Pricing/markup/GST engine, branded PDFs | **Done (basics)**: GST split, immutable snapshot, customer PDF. Not done: Unicode fonts (rupee sign, Indian scripts), logo and bank details on the PDF, quotation edit/versioning/status workflow, sending by email/WhatsApp, TCS rules (need an accountant's input), per-supplier markup rules UI |
 | 7 | Booking, Razorpay payments, webhooks, vouchers | **Half done**: Traveldesk reserve/confirm/cancel/voucher against the test API. Not done: Razorpay and customer payment collection (the agency fronts the supplier cost today), webhooks, our own branded voucher, booking from a quotation/itinerary, notifications. Before going live: confirm with Traveldesk what status `PendingVerification` means after confirm, and get production access |
 | 8 | Subscriptions, tenant dashboard, super-admin | **Done except billing**: plans as data, trials, limit enforcement, dashboard, team, admin console. Not done: Razorpay subscriptions/invoices (needs keys and GST decisions), email invitations and password reset (needs an email provider), plan self-service |
-| 9 | PWA (service worker), Capacitor Android | Later |
-| 10 | E2E tests, staging/production deployment | Later |
+| 9 | PWA (service worker), Capacitor Android | **PWA done and tested. Capacitor configured, not built on a device**: needs the Android SDK, an app id, signing keys and a decision on Apple's website-wrapper rule (MOBILE_APP_GUIDE.md) |
+| 10 | E2E tests, staging/production deployment | **E2E suite and CI done; shared rate limits; config checks; deployed.** Not done: error reporting (Sentry), uptime monitoring, CSP enforcement (report-only today), a staging environment, email, self-hosted fonts |
 
 ## Blocked on external requirements
 

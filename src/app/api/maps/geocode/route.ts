@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await requireTenantContext("itinerary:write");
     if (publicMapToken() === null) return NextResponse.json({ error: "MAPS_NOT_CONFIGURED" }, { status: 503 });
-    if (!rateLimit(`geocode:${ctx.userId}`, 30, 60_000)) {
+    if (!(await rateLimit(`geocode:${ctx.userId}`, 30, 60_000))) {
       return NextResponse.json({ error: "Too many searches. Please slow down." }, { status: 429 });
     }
     const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));

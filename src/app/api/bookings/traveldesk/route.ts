@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked;
   try {
     const ctx = await requireTenantContext("booking:create");
-    if (!rateLimit(`reserve:${ctx.userId}`, 10, 60_000)) {
+    if (!(await rateLimit(`reserve:${ctx.userId}`, 10, 60_000))) {
       return NextResponse.json({ error: "Too many booking attempts. Please slow down." }, { status: 429 });
     }
     const key = request.headers.get("idempotency-key") ?? "";

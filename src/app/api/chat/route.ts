@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     return authErrorResponse(error) ?? NextResponse.json({ error: "Failed to process chat" }, { status: 500 });
   }
 
-  if (!rateLimit(`chat:${ctx.userId}`, 30, 60_000)) {
+  if (!(await rateLimit(`chat:${ctx.userId}`, 30, 60_000))) {
     return NextResponse.json({ error: "Too many messages. Please slow down." }, { status: 429 });
   }
 

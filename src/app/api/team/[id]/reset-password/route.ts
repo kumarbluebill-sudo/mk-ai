@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (blocked) return blocked;
   try {
     const ctx = await requireTenantContext("staff:manage");
-    if (!rateLimit(`team-reset:${ctx.userId}`, 10, 60_000)) return NextResponse.json({ error: "Too many attempts. Please slow down." }, { status: 429 });
+    if (!(await rateLimit(`team-reset:${ctx.userId}`, 10, 60_000))) return NextResponse.json({ error: "Too many attempts. Please slow down." }, { status: 429 });
     const { id } = await params;
     const { temporaryPassword } = await resetMemberPassword(ctx, id);
     return NextResponse.json({ success: true, temporaryPassword }, { headers: { "cache-control": "no-store" } });

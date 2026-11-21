@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked;
   try {
     const ctx = await requireTenantContext();
-    if (!rateLimit(`pw:${ctx.userId}`, 5, 15 * 60_000)) {
+    if (!(await rateLimit(`pw:${ctx.userId}`, 5, 15 * 60_000))) {
       return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
     }
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));

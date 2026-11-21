@@ -23,7 +23,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const ctx = await requireTenantContext("itinerary:write");
-    if (!rateLimit(`designer:${ctx.userId}`, 120, 60_000)) {
+    if (!(await rateLimit(`designer:${ctx.userId}`, 120, 60_000))) {
       return NextResponse.json({ error: "Too many edits. Please slow down." }, { status: 429 });
     }
     const { id } = await params;

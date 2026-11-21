@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Phase 9: installable app (PWA) and native shell
+- Installable web app: manifest with icons (192, 512, maskable, Apple touch), shortcuts, install prompt, iOS instructions, offline page and offline banner. Service worker stores **nothing that belongs to a user** (only the offline page and public hashed static files); verified in a real browser after a signed-in session.
+- Capacitor Android/iOS shell around the deployed site (`capacitor.config.ts`, `capacitor-web/`). Config loads and `cap add/sync android` succeed. **Not built or run on any device** (no Android SDK); see MOBILE_APP_GUIDE.md for the decisions needed before a store release, including Apple's website-wrapper rule.
+
+### Phase 10: end-to-end tests and deployment hardening
+- 26 Playwright end-to-end tests (smoke, PWA, tenancy, plans/team/admin, shared rate limits) against two servers and a real database, plus CI jobs for them (empty Postgres 16, real migrations) and for `npm audit`. The suite refuses to run against production; locally it uses a Neon `e2e` branch. Rate-limit tests were mutation-checked.
+- **Rate limits are now shared across server instances** (Postgres `RateLimitBucket`, one atomic upsert; in-memory fallback if the database call fails). Before, each Vercel instance had its own counter, so brute-force limits were weaker than they looked. Migration `rate_limit`.
+- Configuration checks (`src/server/env-check.ts`): `/api/health` now reports `down` (503), `degraded` or `ok` with counts; **/admin/system** lists each problem by variable name. Each check is a mistake that really happened in this project.
+- Content-Security-Policy in report-only mode; the E2E test immediately caught that Google Fonts were missing from the allow-list.
+- Docs: CLOUD_DEPLOYMENT_GUIDE rewritten to match what is actually running (release steps, rollback, backups, going live); TESTING_GUIDE; MOBILE_APP_GUIDE.
+- 229 unit tests plus 26 end-to-end tests.
+
 ### Phase 8: subscriptions, tenant dashboard, team, platform admin
 - Plans as data (`Plan`) and one subscription per agency (`Subscription`, status TRIAL/ACTIVE/PAST_DUE/CANCELLED/SUSPENDED, trial end, per-agency limit overrides). Four starting plans with placeholder limits; existing agencies backfilled to ACTIVE Enterprise; new agencies start a 14-day trial (`TRIAL_DAYS`, `TRIAL_PLAN_KEY`). Migrations `plans_subscriptions`, `must_change_password`.
 - Enforcement before billable work: chat (AI feature, token budget, conversation quota), manual trips, quotations (also the AI tool), booking holds (feature + quota; replays are free), team seats. 403 with `PLAN_LIMIT` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` and a readable message; suspended, cancelled and trial-ended agencies keep read access.

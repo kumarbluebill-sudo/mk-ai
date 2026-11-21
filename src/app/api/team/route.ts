@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked;
   try {
     const ctx = await requireTenantContext("staff:manage");
-    if (!rateLimit(`team:${ctx.userId}`, 20, 60_000)) return NextResponse.json({ error: "Too many attempts. Please slow down." }, { status: 429 });
+    if (!(await rateLimit(`team:${ctx.userId}`, 20, 60_000))) return NextResponse.json({ error: "Too many attempts. Please slow down." }, { status: 429 });
     let json: unknown;
     try {
       json = await request.json();

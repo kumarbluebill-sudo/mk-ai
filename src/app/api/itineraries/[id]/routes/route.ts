@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const ctx = await requireTenantContext("itinerary:read");
     if (publicMapToken() === null) return NextResponse.json({ error: "MAPS_NOT_CONFIGURED" }, { status: 503 });
-    if (!rateLimit(`routes:${ctx.userId}`, 60, 60_000)) {
+    if (!(await rateLimit(`routes:${ctx.userId}`, 60, 60_000))) {
       return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 });
     }
     const { id } = await params;

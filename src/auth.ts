@@ -26,7 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const { email, password, totp } = parsed.data;
 
         // Throttle password guessing per account (10 attempts / 15 min).
-        if (!rateLimit(`login:${email}`, 10, 15 * 60 * 1000)) return null;
+        if (!(await rateLimit(`login:${email}`, 10, 15 * 60 * 1000))) return null;
 
         const prisma = getPrismaClient();
         const user = await prisma.user.findUnique({

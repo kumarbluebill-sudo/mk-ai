@@ -13,3 +13,12 @@ dist/
 .neon
 
 .env*
+
+# Capacitor native projects are generated on demand (npm run cap:add:android / cap:add:ios)
+/android
+/ios
+
+# Playwright
+/test-results
+/playwright-report
+/blob-report

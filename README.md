@@ -9,12 +9,13 @@ Multi-tenant AI travel planning SaaS by MK Solutions. Travel agencies register t
 - AI chat with provider-independent adapters (Anthropic, OpenAI, optional fallback), tool calling, per-conversation memory, token-usage logging and streamed progress.
 - Viator Partner API v2: live activity search, product details, availability and pricing.
 - Traveldesk test bookings (`/bookings`): reserve, confirm, supplier voucher, cancel. Test environment only; customer payment is not collected yet.
+- Installable app (PWA) with an offline page that never stores user data; Capacitor config for an Android/iOS shell (not built on a device).
 - Plans and subscriptions (limits are editable data), usage dashboard, team management and a platform admin console. No online billing yet.
 - Quotations: priced from the itinerary with optional GST split, stored as an immutable snapshot, downloadable as a PDF.
 - Itinerary designer (`/designer`): edit trips manually or after the AI builds them, reorder, map with Mapbox tiles, place search and real driving legs (straight-line estimates when Mapbox is not configured).
 - Supplier adapter framework (`src/server/suppliers`): normalised inventory, parallel search with per-supplier timeout, failure isolation, 60s cache, price/rating ranking, budget filter. `GET /api/suppliers/search` and `/api/suppliers/status`.
 - Itinerary editing by targeted patches, pricing with markup/tax in exact minor units, draft quotations.
-- Docker, docker-compose, CI workflow, health check, 211 unit tests.
+- Docker, docker-compose, CI workflow, health check, 229 unit tests and 26 end-to-end tests.
 
 ## What does NOT exist yet
 
@@ -43,6 +44,8 @@ Or with Docker: `docker compose up --build` (app on :3000, Postgres, Redis, migr
 | --- | --- |
 | `npm run dev` / `build` / `start` | Development, production build, run build |
 | `npm run typecheck` / `lint` / `test` | Quality gates (also run in CI) |
+| `npm run test:e2e` | End-to-end tests (needs a throwaway database, see TESTING_GUIDE) |
+| `npm run admin:grant -- email` | Make someone a platform administrator (they also need two-factor) |
 | `npm run db:generate` | Generate Prisma client |
 
 ## Layout
@@ -57,4 +60,4 @@ prisma/             Schema and migrations
 
 ## Documentation
 
-[ARCHITECTURE](ARCHITECTURE.md) · [DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md) · [DATABASE_SCHEMA](DATABASE_SCHEMA.md) · [API_INTEGRATION_GUIDE](API_INTEGRATION_GUIDE.md) · [SECURITY_GUIDE](SECURITY_GUIDE.md) · [TESTING_GUIDE](TESTING_GUIDE.md) · [CLOUD_DEPLOYMENT_GUIDE](CLOUD_DEPLOYMENT_GUIDE.md) · [SAAS_SUBSCRIPTION_GUIDE](SAAS_SUBSCRIPTION_GUIDE.md) · [CHANGELOG](CHANGELOG.md)
+[ARCHITECTURE](ARCHITECTURE.md) · [DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md) · [DATABASE_SCHEMA](DATABASE_SCHEMA.md) · [API_INTEGRATION_GUIDE](API_INTEGRATION_GUIDE.md) · [SECURITY_GUIDE](SECURITY_GUIDE.md) · [TESTING_GUIDE](TESTING_GUIDE.md) · [CLOUD_DEPLOYMENT_GUIDE](CLOUD_DEPLOYMENT_GUIDE.md) · [MOBILE_APP_GUIDE](MOBILE_APP_GUIDE.md) · [SAAS_SUBSCRIPTION_GUIDE](SAAS_SUBSCRIPTION_GUIDE.md) · [CHANGELOG](CHANGELOG.md)

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const ctx = await requireTenantContext();
     const prisma = getPrismaClient();
 
-    if (!rateLimit(`mfa:${ctx.userId}`, 10, 15 * 60 * 1000)) {
+    if (!(await rateLimit(`mfa:${ctx.userId}`, 10, 15 * 60 * 1000))) {
       return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
     }
 

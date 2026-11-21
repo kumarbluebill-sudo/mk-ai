@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (blocked) return blocked;
   try {
     const ctx = await requireTenantContext("booking:manage");
-    if (!rateLimit(`cancel:${ctx.userId}`, 10, 60_000)) {
+    if (!(await rateLimit(`cancel:${ctx.userId}`, 10, 60_000))) {
       return NextResponse.json({ error: "Too many attempts. Please slow down." }, { status: 429 });
     }
     const { id } = await params;

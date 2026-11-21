@@ -5,7 +5,7 @@ import { rateLimit } from "@/server/rate-limit";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
   }
 

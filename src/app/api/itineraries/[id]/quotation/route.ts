@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await requireTenantContext("quotation:write");
-    if (!rateLimit(`quote:${ctx.userId}`, 20, 60_000)) {
+    if (!(await rateLimit(`quote:${ctx.userId}`, 20, 60_000))) {
       return NextResponse.json({ error: "Too many quotations. Please slow down." }, { status: 429 });
     }
     const { id } = await params;
