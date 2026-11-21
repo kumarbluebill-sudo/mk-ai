@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrismaClient } from "@/lib/prisma";
+import { authErrorResponse, requireTenantContext } from "@/server/tenant-context";
 import type { ConversationState } from "@/lib/conversation-flow";
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireTenantContext("itinerary:write");
     const body = await request.json() as ConversationState;
     const {
       destination,
@@ -23,11 +24,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prisma = getPrismaClient();
+    // Tenant-scoped client: itinerary/quotation rows are stamped with the caller's tenant.
+    const prisma = ctx.db;
+    const customer = await prisma.customer.findFirst({ where: { userId: ctx.userId } });
+    if (!customer) {
+      return NextResponse.json({ error: "Customer profile not found" }, { status: 409 });
+    }
 
     // Create itinerary
     const itinerary = await prisma.itinerary.create({
       data: {
+        tenantId: ctx.tenantId,
         title: `${destination.charAt(0).toUpperCase() + destination.slice(1)} Trip - ${travelers.adults} traveler${travelers.adults > 1 ? "s" : ""}`,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
@@ -73,8 +80,8 @@ export async function POST(request: NextRequest) {
             dayId: day.id,
             title: capitalizeActivity(activity),
             description: `Enjoy ${activity} experience in ${destination}`,
-            supplierName: "VIATOR",
-            liveStatus: "AVAILABLE",
+            supplierName: "ESTIMATE",
+            liveStatus: "DEMO",
             price: basePrice,
             currency: "USD",
             metadata: {
@@ -100,8 +107,8 @@ export async function POST(request: NextRequest) {
           data: {
             dayId: day.id,
             title: `${capitalizeAccommodation(accommodation)} Accommodation`,
-            supplierName: "BOOKING",
-            liveStatus: "AVAILABLE",
+            supplierName: "ESTIMATE",
+            liveStatus: "DEMO",
             price: accommodationPrice,
             currency: "USD",
             metadata: {
@@ -126,8 +133,8 @@ export async function POST(request: NextRequest) {
           data: {
             dayId: day.id,
             title: "Private Transfer",
-            supplierName: "VIATOR",
-            liveStatus: "AVAILABLE",
+            supplierName: "ESTIMATE",
+            liveStatus: "DEMO",
             price: transportPrice,
             currency: "USD",
             metadata: {
@@ -144,9 +151,10 @@ export async function POST(request: NextRequest) {
     // Create quotation
     const quotation = await prisma.quotation.create({
       data: {
-        customerId: "demo",
+        tenantId: ctx.tenantId,
+        customerId: customer.id,
         itineraryId: itinerary.id,
-        reference: `PKG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        reference: `PKG-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         status: "DRAFT",
         currency: "USD",
         subtotal: totalPrice,
@@ -183,6 +191,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
     console.error("Package creation error:", error);
     return NextResponse.json(
       {

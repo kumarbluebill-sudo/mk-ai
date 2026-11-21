@@ -1,23 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 /**
  * Quick Package Builder - NO DATABASE REQUIRED
- * Returns complete package with pricing immediately
+ * Returns an ESTIMATE based on demo rate tables (not live supplier prices).
  */
+
+const quickPackageSchema = z.object({
+  destination: z.string().min(1).default("bali"),
+  travelers: z
+    .object({
+      adults: z.number().int().min(1).default(2),
+      children: z.number().int().min(0).default(0),
+    })
+    .default({ adults: 2, children: 0 }),
+  startDate: z.string().default("2026-12-15"),
+  endDate: z.string().default("2026-12-20"),
+  tripType: z.string().default("customized"),
+  activities: z.array(z.string()).min(1).default(["culture", "adventure"]),
+  accommodation: z.string().default("midrange"),
+  transport: z.string().default("private"),
+});
+
+interface ItineraryItem {
+  day: number;
+  date: string;
+  title: string;
+  type: "activity" | "accommodation" | "transport";
+  price: string;
+  currency: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = quickPackageSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
     const {
-      destination = "bali",
-      travelers = { adults: 2, children: 0 },
-      startDate = "2026-12-15",
-      endDate = "2026-12-20",
-      tripType = "customized",
-      activities = ["culture", "adventure"],
-      accommodation = "midrange",
-      transport = "private",
-    } = body;
+      destination,
+      travelers,
+      startDate,
+      endDate,
+      tripType,
+      activities,
+      accommodation,
+      transport,
+    } = parsed.data;
 
     // Calculate days
     const start = new Date(startDate);
@@ -25,6 +57,12 @@ export async function POST(request: NextRequest) {
     const days = Math.ceil(
       (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     );
+    if (!Number.isFinite(days) || days < 1) {
+      return NextResponse.json(
+        { success: false, error: "endDate must be after startDate" },
+        { status: 400 }
+      );
+    }
 
     // Calculate pricing
     const pricing = {
@@ -40,7 +78,7 @@ export async function POST(request: NextRequest) {
     const total = Math.round((subtotal + taxes + markup) * 100) / 100;
 
     // Build itinerary items
-    const itineraryItems = [];
+    const itineraryItems: ItineraryItem[] = [];
     for (let i = 0; i < days; i++) {
       const dayDate = new Date(start);
       dayDate.setDate(dayDate.getDate() + i);
@@ -79,8 +117,11 @@ export async function POST(request: NextRequest) {
 
     const response = {
       success: true,
+      // Hardcoded demo rate tables - NOT live supplier inventory.
+      isEstimate: true,
+      source: "demo-rate-table",
       package: {
-        reference: `PKG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        reference: `PKG-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         title: `${capitalizeDestination(destination)} Trip - ${travelers.adults} traveler${travelers.adults > 1 ? "s" : ""}`,
         destination: capitalizeDestination(destination),
         summary: {

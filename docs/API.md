@@ -51,3 +51,17 @@ Checks live Viator availability and pricing for one activity. This returns the a
 Only Viator activities are priced. Hotels, flights, transfers, and complete trip totals are not included. An empty `bookableItems` array means Viator returned no bookable price for the requested date and traveler mix.
 
 Viator booking, payments and other suppliers are not implemented. Future suppliers require authorized documentation and credentials; implement server-only adapters and do not guess supplier URLs or parameters.
+
+## Authentication (added)
+
+All routes except `/api/health`, `/api/destinations`, `/api/auth/*` and `/api/package/quick` require a signed-in session and return `401` otherwise (`403` when the role lacks permission). `liveInventory` in Viator responses is `true` only when `VIATOR_API_ENV=production`.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/auth/register` | `{ name, email, password (>=10), agencyName }` creates a tenant and owner account |
+| `/api/auth/[...nextauth]` | Auth.js sign-in/session endpoints |
+| `POST /api/auth/mfa/setup`, `/enable`, `/disable` | TOTP enrolment (authenticator app) |
+| `GET /api/chat` | Recent conversations; `?id=` returns one conversation's messages and itinerary |
+| `POST /api/chat` | `{ conversationId?, message }`; responds as a Server-Sent Events stream of `conversation`, `tool_start`, `tool_result`, `message`, `error`, `done` events |
+| `GET /api/health` | Liveness plus database readiness (`503` when the database is unreachable) |
+| `POST /api/package/create`, `/api/viator/booking` | Require auth; the booking route creates local DRAFT records only |

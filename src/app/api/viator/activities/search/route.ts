@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardRoute } from "@/server/tenant-context";
 import { getPrismaClient, disconnectPrisma } from "@/lib/prisma";
 import { getViatorService } from "@/integrations/viator/service";
 
 export async function GET(request: NextRequest) {
+  const denied = await guardRoute("chat:use");
+  if (denied) return denied;
   try {
     const keyword = request.nextUrl.searchParams.get("keyword") ?? "";
     const destinationId =

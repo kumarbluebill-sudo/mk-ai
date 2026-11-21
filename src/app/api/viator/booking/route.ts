@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrismaClient } from "@/lib/prisma";
+import { recordAudit } from "@/server/audit";
+import { authErrorResponse, requireTenantContext } from "@/server/tenant-context";
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await requireTenantContext("booking:create");
     const body = await request.json();
     const {
       activityId,
@@ -24,21 +26,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prisma = getPrismaClient();
+    const prisma = ctx.db;
+    const customer = await prisma.customer.findFirst({ where: { userId: ctx.userId } });
+    if (!customer) {
+      return NextResponse.json({ error: "Customer profile not found" }, { status: 409 });
+    }
 
-    // Create booking record
+    // Create a DRAFT booking record. This does NOT reserve anything with Viator.
     const booking = await prisma.booking.create({
       data: {
-        customerId: "demo", // In production, link to actual customer
-        reference: `VTR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        tenantId: ctx.tenantId,
+        customerId: customer.id,
+        reference: `VTR-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         status: "DRAFT",
         total: price,
         currency,
         items: {
           create: {
             status: "DRAFT",
-            supplierReference: activityId,
+            // supplierReference stays empty until the supplier returns a real booking reference.
             details: {
+              productCode: activityId,
               title,
               date,
               participants,
@@ -52,6 +60,8 @@ export async function POST(request: NextRequest) {
         items: true,
       },
     });
+
+    void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "booking.draft_created", entity: "Booking", entityId: booking.id });
 
     return NextResponse.json({
       success: true,
@@ -68,6 +78,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
     console.error("Booking error:", error);
     return NextResponse.json(
       {
@@ -81,6 +93,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const ctx = await requireTenantContext("booking:read");
     const bookingId = request.nextUrl.searchParams.get("id") ?? "";
 
     if (!bookingId) {
@@ -90,8 +103,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const prisma = getPrismaClient();
-    const booking = await prisma.booking.findUnique({
+    const booking = await ctx.db.booking.findUnique({
       where: { id: bookingId },
       include: {
         items: true,
@@ -112,6 +124,8 @@ export async function GET(request: NextRequest) {
       booking,
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
     console.error("Booking fetch error:", error);
     return NextResponse.json(
       {
@@ -123,8 +137,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Only these transitions may be requested by a client. CONFIRMED / PARTIALLY_CONFIRMED /
+// REFUNDED can only be set by server code after a real supplier or payment confirmation.
+const CLIENT_SETTABLE_STATUSES = new Set(["AWAITING_APPROVAL", "CANCELLED"]);
+
 export async function PATCH(request: NextRequest) {
   try {
+    const ctx = await requireTenantContext("booking:create");
     const body = await request.json();
     const { bookingId, status, paymentDetails } = body;
 
@@ -135,9 +154,14 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const prisma = getPrismaClient();
+    if (!CLIENT_SETTABLE_STATUSES.has(status)) {
+      return NextResponse.json(
+        { error: `Status ${status} cannot be set directly` },
+        { status: 400 }
+      );
+    }
 
-    const updatedBooking = await prisma.booking.update({
+    const updatedBooking = await ctx.db.booking.update({
       where: { id: bookingId },
       data: {
         status,
@@ -148,12 +172,16 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
+    void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "booking.status_changed", entity: "Booking", entityId: bookingId, metadata: { status } });
+
     return NextResponse.json({
       success: true,
       message: `Booking status updated to ${status}`,
       booking: updatedBooking,
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
     console.error("Booking update error:", error);
     return NextResponse.json(
       {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardRoute } from "@/server/tenant-context";
 import { getViatorClient } from "@/integrations/viator/client";
 
 export async function GET(request: NextRequest) {
+  const denied = await guardRoute("chat:use");
+  if (denied) return denied;
   try {
     const keyword = request.nextUrl.searchParams.get("keyword") ?? "";
     const startDate = request.nextUrl.searchParams.get("startDate") ?? "";
@@ -42,7 +45,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       source: "VIATOR",
       environment: client.getEnvironment(),
-      liveInventory: true,
+      // Sandbox responses are test data, not sellable live inventory.
+      liveInventory: client.getEnvironment() === "production",
       ...results,
     });
   } catch (error) {

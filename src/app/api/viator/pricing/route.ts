@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardRoute } from "@/server/tenant-context";
 import { getViatorClient } from "@/integrations/viator/client";
 
 type QuoteInput = {
@@ -65,6 +66,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function getQuote(input: QuoteInput) {
+  const denied = await guardRoute("chat:use");
+  if (denied) return denied;
   const { activityId, date, adults, children, currency, productOptionCode } = input;
 
   if (!activityId.trim()) {
@@ -109,7 +112,8 @@ async function getQuote(input: QuoteInput) {
       success: true,
       source: "VIATOR",
       environment: client.getEnvironment(),
-      liveInventory: true,
+      // Sandbox responses are test data, not sellable live inventory.
+      liveInventory: client.getEnvironment() === "production",
       checkedAt: new Date().toISOString(),
       activity: {
         id: activity.id,

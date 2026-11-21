@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardRoute } from "@/server/tenant-context";
 import { getPrismaClient } from "@/lib/prisma";
 import { getViatorService } from "@/integrations/viator/service";
 
 export async function POST(request: NextRequest) {
+  const denied = await guardRoute("supplier:manage");
+  if (denied) return denied;
   try {
     const prisma = getPrismaClient();
     const service = getViatorService(prisma);
@@ -34,6 +37,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = await guardRoute("supplier:manage");
+  if (denied) return denied;
   try {
     const prisma = getPrismaClient();
     const service = getViatorService(prisma);

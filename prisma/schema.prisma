@@ -65,42 +65,115 @@ enum VoucherStatus {
   CANCELLED
 }
 
+enum TenantRole {
+  OWNER
+  ADMIN
+  MANAGER
+  CONSULTANT
+  SALES
+  ACCOUNTS
+  READONLY
+}
+
+model Tenant {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  customDomain String? @unique
+  branding Json?
+  planId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships Membership[]
+  customers Customer[]
+  conversations Conversation[]
+  itineraries Itinerary[]
+  quotations Quotation[]
+  bookings Booking[]
+  payments Payment[]
+  vouchers Voucher[]
+  markups MarkupSetting[]
+  companySettings CompanySettings[]
+  supplierCredentials SupplierCredential[]
+  auditLogs AuditLog[]
+  aiUsage AiUsage[]
+}
+
+model Membership {
+  id String @id @default(cuid())
+  userId String
+  tenantId String
+  role TenantRole @default(CONSULTANT)
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
 model User {
   id String @id @default(cuid())
   email String @unique
   name String?
   passwordHash String?
   role UserRole @default(CUSTOMER)
+  isSuperAdmin Boolean @default(false)
+  totpSecretEncrypted String? @db.Text
+  totpEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   customer Customer?
+  memberships Membership[]
   messages Message[]
   auditLogs AuditLog[]
+  aiUsage AiUsage[]
 }
 
 model Customer {
   id String @id @default(cuid())
+  tenantId String
   userId String @unique
   phone String?
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversations Conversation[]
   itineraries Itinerary[]
   quotations Quotation[]
   bookings Booking[]
   createdAt DateTime @default(now())
+  @@index([tenantId])
 }
 
 model Conversation {
   id String @id @default(cuid())
+  tenantId String
   customerId String
   title String @default("New travel search")
   archived Boolean @default(false)
+  // Agent working memory: selected inventory, itinerary, quotation, booking status.
+  state Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   messages Message[]
   requirements TravelRequirements?
+  @@index([tenantId, updatedAt])
   @@index([customerId, updatedAt])
+}
+
+model AiUsage {
+  id String @id @default(cuid())
+  tenantId String
+  userId String?
+  provider String
+  model String
+  inputTokens Int @default(0)
+  outputTokens Int @default(0)
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([tenantId, createdAt])
 }
 
 model Message {
@@ -172,7 +245,7 @@ model Supplier {
   demoMode Boolean @default(true)
   config Json?
   products SupplierProduct[]
-  credentials SupplierCredential?
+  credentials SupplierCredential[]
   searches InventorySearch[]
   bookings BookingItem[]
   markups MarkupSetting[]
@@ -182,10 +255,13 @@ model Supplier {
 
 model SupplierCredential {
   id String @id @default(cuid())
-  supplierId String @unique
+  tenantId String
+  supplierId String
   encryptedPayload String @db.Text
   updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, supplierId])
 }
 
 model SupplierProduct {
@@ -264,12 +340,14 @@ model Activity {
 
 model Itinerary {
   id String @id @default(cuid())
+  tenantId String
   customerId String?
   destinationId String?
   title String
   startDate DateTime?
   endDate DateTime?
   status String @default("DRAFT")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   destination Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
   days ItineraryDay[]
@@ -277,6 +355,7 @@ model Itinerary {
   bookings Booking[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tenantId, updatedAt])
 }
 
 model ItineraryDay {
@@ -313,6 +392,8 @@ model ItineraryItem {
 
 model Quotation {
   id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId String
   itineraryId String?
   reference String @unique
@@ -328,6 +409,7 @@ model Quotation {
   itinerary Itinerary? @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
   items QuotationItem[]
   createdAt DateTime @default(now())
+  @@index([tenantId, createdAt])
 }
 
 model QuotationItem {
@@ -344,6 +426,8 @@ model QuotationItem {
 
 model Booking {
   id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerId String
   itineraryId String?
   reference String @unique
@@ -358,6 +442,7 @@ model Booking {
   vouchers Voucher[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tenantId, createdAt])
 }
 
 model BookingItem {
@@ -376,6 +461,8 @@ model BookingItem {
 
 model Payment {
   id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookingId String
   gateway String @default("RAZORPAY")
   gatewayReference String? @unique
@@ -388,6 +475,7 @@ model Payment {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   refunds Refund[]
   createdAt DateTime @default(now())
+  @@index([tenantId])
 }
 
 model Refund {
@@ -403,6 +491,8 @@ model Refund {
 
 model Voucher {
   id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookingId String
   bookingItemId String?
   reference String @unique
@@ -412,10 +502,13 @@ model Voucher {
   issuedAt DateTime?
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   bookingItem BookingItem? @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+  @@index([tenantId])
 }
 
 model CompanySettings {
   id String @id @default(cuid())
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name String @default("MK Solutions")
   logoUrl String?
   address String?
@@ -430,6 +523,9 @@ model CompanySettings {
 
 model MarkupSetting {
   id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
   supplierId String?
   percentage Decimal? @db.Decimal(7, 4)
   fixedAmount Decimal? @db.Decimal(12, 2)
@@ -440,6 +536,9 @@ model MarkupSetting {
 
 model AuditLog {
   id String @id @default(cuid())
+  // Nullable: platform-level (super admin) events have no tenant.
+  tenantId String?
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   userId String?
   action String
   entity String
