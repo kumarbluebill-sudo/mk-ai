@@ -137,8 +137,8 @@ export function ChatInterface() {
       });
 
       if (!response.ok || !response.body) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "Chat request failed.");
+        const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message || data.error || "Chat request failed.");
       }
 
       const reader = response.body.getReader();
@@ -211,6 +211,13 @@ export function ChatInterface() {
         <div style={styles.header}>
           <h2 style={{ margin: 0 }}>MK AI Travel Assistant</h2>
           <p style={{ margin: "4px 0 0" }}>Plan your trip with live supplier data where available</p>
+          <p style={{ margin: "8px 0 0", fontSize: 14 }}>
+            <Link href="/designer" style={{ color: "#2563eb" }}>Trips</Link>
+            {" · "}
+            <Link href="/bookings" style={{ color: "#2563eb" }}>Bookings</Link>
+            {" · "}
+            <Link href="/dashboard" style={{ color: "#2563eb" }}>Dashboard</Link>
+          </p>
         </div>
 
         {fallbackMode && (

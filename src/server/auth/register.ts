@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createTrialSubscription } from "@/server/billing/subscription";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { hashPassword } from "./password";
 
@@ -49,6 +50,7 @@ export async function registerAgency(prisma: PrismaClient, input: RegisterInput)
     await tx.membership.create({ data: { userId: user.id, tenantId: tenant.id, role: "OWNER" } });
     await tx.customer.create({ data: { tenantId: tenant.id, userId: user.id } });
     await tx.companySettings.create({ data: { tenantId: tenant.id, name: input.agencyName } });
+    await createTrialSubscription(tx, tenant.id);
 
     await tx.auditLog.create({
       data: { tenantId: tenant.id, userId: user.id, action: "tenant.registered", entity: "Tenant", entityId: tenant.id },

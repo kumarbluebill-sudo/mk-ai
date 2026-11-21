@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { getTravelDeskClient, TravelDeskError, type TravelDeskClient } from "@/integrations/traveldesk/client";
 import { recordAudit } from "@/server/audit";
+import { assertFeature, assertWithinLimit } from "@/server/billing/limits";
 import { can } from "@/server/permissions";
 import { checkTravelDeskAvailability, type SlotResult } from "@/server/suppliers/traveldesk-availability";
 import type { TenantContext } from "@/server/tenant-context";
@@ -284,6 +285,10 @@ export async function reserveTraveldeskBooking(
   const key = `${ctx.tenantId}:${idempotencyKey}`;
   const existing = await ctx.db.booking.findFirst({ where: { idempotencyKey: key, customerId: customer.id }, include: { items: true } });
   if (existing) return { booking: toView(ctx, existing), replay: true };
+
+  // A replay above is free; a new hold is not.
+  await assertFeature(ctx, "bookings");
+  await assertWithinLimit(ctx, "bookings");
 
   if (input.date < todayUtc()) throw new BookingError("INVALID", "The date is in the past.");
   const client = getClient();

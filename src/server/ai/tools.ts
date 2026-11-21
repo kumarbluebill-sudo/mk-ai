@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LimitError } from "@/server/billing/limits";
 import { createQuotation, QuotationError, quoteOptionsSchema, visiblePrice } from "@/server/quotation/service";
 import { getTravelDeskClient, TravelDeskError } from "@/integrations/traveldesk/client";
 import { checkTravelDeskAvailability } from "@/server/suppliers/traveldesk-availability";
@@ -366,6 +367,8 @@ export const TOOLS: ToolDefinition[] = [
         };
       } catch (error) {
         if (error instanceof QuotationError) return { error: error.code, message: error.message };
+        // A plan limit is a normal outcome the assistant should explain, not a crash.
+        if (error instanceof LimitError) return { error: error.code, message: error.message };
         throw error;
       }
     },

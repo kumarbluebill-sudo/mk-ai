@@ -17,7 +17,9 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "admin:grant": "node scripts/admin-flag.mjs grant",
+    "admin:revoke": "node scripts/admin-flag.mjs revoke"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

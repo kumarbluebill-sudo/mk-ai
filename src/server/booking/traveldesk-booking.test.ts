@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetTravelDeskClient } from "@/integrations/traveldesk/client";
+import * as limits from "@/server/billing/limits";
 import type { TenantContext } from "@/server/tenant-context";
 import {
   BookingError,
@@ -12,6 +13,20 @@ import {
   type ReserveInput,
 } from "./traveldesk-booking";
 import { mapSupplierBooking, reservationDeadline } from "./traveldesk-status";
+
+// Plan enforcement has its own tests (billing.test.ts); here it is a controllable stub.
+vi.mock("@/server/billing/limits", () => ({
+  assertFeature: vi.fn(async () => undefined),
+  assertWithinLimit: vi.fn(async () => undefined),
+  LimitError: class LimitError extends Error {
+    constructor(
+      readonly code: string,
+      message: string
+    ) {
+      super(message);
+    }
+  },
+}));
 
 // ------------------------------------------------------------------ in-memory database
 interface Item {
@@ -355,6 +370,31 @@ describe("reserve", () => {
     expect(second.replay).toBe(true);
     expect(second.booking.id).toBe(first.booking.id);
     expect(rows).toHaveLength(1);
+  });
+
+  it("checks the plan before any supplier call, and a plan block never reaches the supplier", async () => {
+    const sim = simulator();
+    const { ctx, rows } = makeCtx();
+    vi.mocked(limits.assertFeature).mockRejectedValueOnce(new limits.LimitError("FEATURE_DISABLED", "Starter does not include supplier bookings."));
+    const err = (await reserveTraveldeskBooking(ctx, input, "k-plan-block1").then(() => null, (e: unknown) => e)) as Error | null;
+    expect(err?.message).toMatch(/does not include/);
+    expect(sim.calls).toEqual([]);
+    expect(rows).toHaveLength(0);
+
+    vi.mocked(limits.assertWithinLimit).mockRejectedValueOnce(new limits.LimitError("PLAN_LIMIT", "Monthly booking limit reached."));
+    expect(await reserveTraveldeskBooking(ctx, input, "k-plan-block2").then(() => null, (e: unknown) => e)).toBeInstanceOf(Error);
+    expect(sim.calls).toEqual([]);
+    expect(limits.assertWithinLimit).toHaveBeenCalledWith(ctx, "bookings");
+  });
+
+  it("a replayed request is free: it does not need plan headroom", async () => {
+    simulator();
+    const { ctx } = makeCtx();
+    await reserveTraveldeskBooking(ctx, input, "k-replay-free");
+    vi.mocked(limits.assertWithinLimit).mockClear();
+    const again = await reserveTraveldeskBooking(ctx, input, "k-replay-free");
+    expect(again.replay).toBe(true);
+    expect(limits.assertWithinLimit).not.toHaveBeenCalled();
   });
 
   it("hides supplier cost from roles without cost:view", async () => {

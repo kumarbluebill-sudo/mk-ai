@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Phase 8: subscriptions, tenant dashboard, team, platform admin
+- Plans as data (`Plan`) and one subscription per agency (`Subscription`, status TRIAL/ACTIVE/PAST_DUE/CANCELLED/SUSPENDED, trial end, per-agency limit overrides). Four starting plans with placeholder limits; existing agencies backfilled to ACTIVE Enterprise; new agencies start a 14-day trial (`TRIAL_DAYS`, `TRIAL_PLAN_KEY`). Migrations `plans_subscriptions`, `must_change_password`.
+- Enforcement before billable work: chat (AI feature, token budget, conversation quota), manual trips, quotations (also the AI tool), booking holds (feature + quota; replays are free), team seats. 403 with `PLAN_LIMIT` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` and a readable message; suspended, cancelled and trial-ended agencies keep read access.
+- Tenant `/dashboard` (plan, status, usage bars, warnings) and `/team` (add with a one-time temporary password, change role, reset, remove) with strict role rules; change-password form in Security.
+- Platform admin console (`/admin`, tenants, plans, audit): flag read from the database on every request, two-factor required, every change audited against the affected agency, cross-origin writes blocked. Grant with `npm run admin:grant -- email`.
+- Security fix: the user's role is now read from the database on every request. Before, a removed or demoted member kept their old power until the 12-hour sign-in token expired. `Membership` and `Subscription` joined the tenant-scoped models.
+- Bug found by a test and fixed before release: a partial plan update would have reset `sortOrder` and `currency` to their defaults.
+- 50 end-to-end checks against the real database (trial, limits, suspend, team, admin with real two-factor) plus 50 new unit tests (211 total). The booking page now shows plan messages in chat instead of an error code.
+- Not built: Razorpay billing, invoices, email invitations and password reset (see SAAS_SUBSCRIPTION_GUIDE.md).
+
 ### Mapbox (finishes phase 5)
 - Map tiles are Mapbox's when a public (pk.) token is configured (OpenStreetMap otherwise). The token is served only to signed-in users and a secret (sk.) token is never sent to the browser.
 - Real driving legs per day via Mapbox Directions (`GET /api/itineraries/[id]/routes`); legs and day totals are labelled "Mapbox", straight-line guesses stay labelled "estimate". Example: Burj Khalifa to Dubai Marina is 22 km / 21 min by road, the straight-line estimate said 25 km / 50 min.

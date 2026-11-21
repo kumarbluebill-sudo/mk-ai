@@ -20,12 +20,17 @@
 | Cost/margin hidden from roles without `cost:view` | pricing tools |
 | `/debug` blocked in production | `src/app/debug/layout.tsx` |
 | Tool results treated as data in the AI system prompt | `src/server/ai/agent.ts` |
+| Role read from the database on every request (removal/demotion is immediate) | `src/server/tenant-context.ts` |
+| Platform admin: DB-checked flag, 2FA required, audited, cross-origin writes blocked; no UI to self-promote | `src/server/admin/*`, `scripts/admin-flag.mjs` |
+| Plan and subscription limits enforced server-side before billable work | `src/server/billing/limits.ts` |
 | Booking money safety: `booking:manage` for confirm/cancel, exact-amount approval, price re-check, live-booking switch, idempotency keys | `src/server/booking/*`, `TRAVELDESK_ALLOW_LIVE_BOOKING` |
 | CSRF defence on booking POSTs (Origin check, plus SameSite cookies) | `src/server/same-origin.ts` |
 | Supplier voucher link (contains an anonymous-access guid) never stored or sent to the browser | `getVoucher` proxies the PDF |
 
 ## Known gaps (do before production)
 
+- **Temporary passwords** for new team members are shown to the owner once and passed on by hand; there is no email invitation or password reset. A password change does not sign out the person's other devices (12-hour sessions).
+- The platform admin console exposes every agency's data to anyone with the flag and 2FA: keep the number of administrators tiny.
 - **Booking has no customer payment step.** Confirming charges the agency's balance with the supplier. Do not enable live bookings until Razorpay (or another collection step) exists.
 - The CSRF Origin check is applied to the booking routes only; apply it to every state-changing route before production.
 - **Rate limiting is per-process memory**; use Redis before running more than one instance.

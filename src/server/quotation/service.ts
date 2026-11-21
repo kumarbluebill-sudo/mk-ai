@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { recordAudit } from "@/server/audit";
+import { assertWithinLimit } from "@/server/billing/limits";
 import { can } from "@/server/permissions";
 import type { TenantContext } from "@/server/tenant-context";
 import type { Itinerary } from "@/server/travel/itinerary";
@@ -46,6 +47,7 @@ export function visiblePrice(ctx: TenantContext, price: PriceBreakdown) {
 }
 
 export async function createQuotation(ctx: TenantContext, itinerary: Itinerary, options: QuoteOptions) {
+  await assertWithinLimit(ctx, "quotations");
   const priced = itinerary.days.flatMap((d) =>
     d.items.filter((i) => i.price !== undefined && i.currency).map((i) => ({ day: d.dayNumber, item: i }))
   );

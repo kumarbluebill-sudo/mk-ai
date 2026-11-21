@@ -8,6 +8,7 @@ import {
   type Itinerary,
   type ItineraryPatch,
 } from "./itinerary";
+import { assertWithinLimit } from "@/server/billing/limits";
 import type { TenantContext } from "@/server/tenant-context";
 import { z } from "zod";
 
@@ -110,6 +111,7 @@ export const blankTripBody = createItinerarySchema;
 export async function createManualItinerary(ctx: TenantContext, input: z.infer<typeof createItinerarySchema>) {
   const customer = await ctx.db.customer.findFirst({ where: { userId: ctx.userId }, select: { id: true } });
   if (!customer) return null;
+  await assertWithinLimit(ctx, "conversations");
   const itinerary = createItinerary(input);
   const state = { itinerary, bookingStatus: "NONE" } as unknown as Prisma.InputJsonValue;
   const convo = await ctx.db.conversation.create({

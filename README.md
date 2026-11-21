@@ -9,11 +9,12 @@ Multi-tenant AI travel planning SaaS by MK Solutions. Travel agencies register t
 - AI chat with provider-independent adapters (Anthropic, OpenAI, optional fallback), tool calling, per-conversation memory, token-usage logging and streamed progress.
 - Viator Partner API v2: live activity search, product details, availability and pricing.
 - Traveldesk test bookings (`/bookings`): reserve, confirm, supplier voucher, cancel. Test environment only; customer payment is not collected yet.
+- Plans and subscriptions (limits are editable data), usage dashboard, team management and a platform admin console. No online billing yet.
 - Quotations: priced from the itinerary with optional GST split, stored as an immutable snapshot, downloadable as a PDF.
 - Itinerary designer (`/designer`): edit trips manually or after the AI builds them, reorder, map with Mapbox tiles, place search and real driving legs (straight-line estimates when Mapbox is not configured).
 - Supplier adapter framework (`src/server/suppliers`): normalised inventory, parallel search with per-supplier timeout, failure isolation, 60s cache, price/rating ranking, budget filter. `GET /api/suppliers/search` and `/api/suppliers/status`.
 - Itinerary editing by targeted patches, pricing with markup/tax in exact minor units, draft quotations.
-- Docker, docker-compose, CI workflow, health check, 161 unit tests.
+- Docker, docker-compose, CI workflow, health check, 211 unit tests.
 
 ## What does NOT exist yet
 

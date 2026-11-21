@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import ChangePasswordForm from "@/components/change-password-form";
 
 type Step = "idle" | "confirm" | "enabled";
 
@@ -56,7 +58,11 @@ export default function SecuritySettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-5 p-6">
-      <h1 className="text-2xl font-semibold">Security</h1>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Security</h1>
+        <Link href="/dashboard" className="rounded border px-3 py-1 text-sm">Dashboard</Link>
+      </header>
+      <ChangePasswordForm />
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Two-factor authentication (authenticator app)</h2>
 

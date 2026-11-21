@@ -18,6 +18,8 @@ export const TENANT_MODELS = new Set([
   "CompanySettings",
   "SupplierCredential",
   "AiUsage",
+  "Membership",
+  "Subscription",
 ]);
 
 type Args = Record<string, unknown> | undefined;

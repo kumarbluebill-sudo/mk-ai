@@ -4,7 +4,7 @@ import { verifyPassword } from "./password";
 import { EmailInUseError, registerAgency, registerSchema, slugify } from "./register";
 
 function fakePrisma(opts: { emailTaken?: boolean; takenSlugs?: string[] } = {}) {
-  const calls = { tenant: vi.fn(), user: vi.fn(), membership: vi.fn(), customer: vi.fn(), settings: vi.fn(), audit: vi.fn() };
+  const calls = { tenant: vi.fn(), user: vi.fn(), membership: vi.fn(), customer: vi.fn(), settings: vi.fn(), audit: vi.fn(), subscription: vi.fn() };
   const tx = {
     tenant: {
       findUnique: vi.fn(async ({ where }: { where: { slug: string } }) =>
@@ -17,6 +17,8 @@ function fakePrisma(opts: { emailTaken?: boolean; takenSlugs?: string[] } = {}) 
     customer: { create: vi.fn(async (a: unknown) => calls.customer(a)) },
     companySettings: { create: vi.fn(async (a: unknown) => calls.settings(a)) },
     auditLog: { create: vi.fn(async (a: unknown) => calls.audit(a)) },
+    plan: { findUnique: vi.fn(async () => ({ id: "plan_starter", active: true })) },
+    subscription: { create: vi.fn(async (a: unknown) => calls.subscription(a)) },
   };
   const prisma = {
     user: { findUnique: vi.fn(async () => (opts.emailTaken ? { id: "existing" } : null)) },
@@ -58,6 +60,10 @@ describe("registerAgency", () => {
     expect(userData.passwordHash).not.toContain("correct horse");
     expect(await verifyPassword("correct horse battery", userData.passwordHash)).toBe(true);
     expect(calls.membership.mock.calls[0][0].data).toMatchObject({ userId: "user1", tenantId: "tenant1", role: "OWNER" });
+    // A new agency starts on a time-limited trial, not on an unlimited plan.
+    const sub = calls.subscription.mock.calls[0][0].data;
+    expect(sub).toMatchObject({ tenantId: "tenant1", planId: "plan_starter", status: "TRIAL" });
+    expect(sub.trialEndsAt.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 3600 * 1000);
     expect(calls.customer.mock.calls[0][0].data).toMatchObject({ tenantId: "tenant1", userId: "user1" });
     expect(calls.settings.mock.calls[0][0].data).toMatchObject({ tenantId: "tenant1" });
     expect(calls.audit.mock.calls[0][0].data).toMatchObject({ action: "tenant.registered", tenantId: "tenant1" });

@@ -5,6 +5,7 @@ import { generateFallbackResponse } from "@/server/ai/fallback";
 import { getConfiguredProviders } from "@/server/ai/providers";
 import { emptyState, type ConversationState } from "@/server/ai/tools";
 import type { ChatMessage } from "@/server/ai/types";
+import { assertFeature, assertWithinLimit } from "@/server/billing/limits";
 import { rateLimit } from "@/server/rate-limit";
 import { authErrorResponse, requireTenantContext, type TenantContext } from "@/server/tenant-context";
 
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
   const { message } = parsed.data;
+
+  // Plan checks come before any work or cost: subscription state, AI feature, token budget, and (for a
+  // brand-new conversation) the monthly conversation quota.
+  try {
+    await assertFeature(ctx, "ai");
+    await assertWithinLimit(ctx, "aiTokens");
+    if (!parsed.data.conversationId) await assertWithinLimit(ctx, "conversations");
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Failed to process chat" }, { status: 500 });
+  }
 
   // Resolve (or create) the conversation before streaming so errors map to proper status codes.
   let conversation;

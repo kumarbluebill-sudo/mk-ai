@@ -41,14 +41,20 @@ beforeEach(() => clearSearchCache());
 
 describe("searchInventory", () => {
   it("queries suppliers in parallel, not one after another", async () => {
+    // Count how many searches are in flight at once instead of trusting wall-clock time, which is
+    // flaky on a busy machine.
+    let active = 0;
+    let maxActive = 0;
     const slow = (id: string) =>
       fake(id, async () => {
-        await new Promise((r) => setTimeout(r, 120));
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 40));
+        active--;
         return { environment: "production", items: [item(id, "1")] };
       });
-    const t0 = Date.now();
     const res = await searchInventory(req, { adapters: [slow("a"), slow("b"), slow("c")] });
-    expect(Date.now() - t0).toBeLessThan(320);
+    expect(maxActive).toBe(3);
     expect(res.items).toHaveLength(3);
     expect(res.suppliers.every((s) => s.status === "OK")).toBe(true);
   });

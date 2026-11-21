@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getPrismaClient } from "@/lib/prisma";
+import { LimitError } from "./billing/limits";
 import { assertCan, Action, ForbiddenError, TenantRoleName } from "./permissions";
 import { scopedPrisma, ScopedPrisma } from "./tenant-scope";
 
@@ -24,12 +25,22 @@ export async function requireTenantContext(action?: Action): Promise<TenantConte
   const session = await auth();
   const user = session?.user;
   if (!user?.id || !user.tenantId) throw new UnauthorizedError();
-  if (action) assertCan(user.role, action);
+
+  // The session token is only proof of who the user is. Their role is read from the database on every
+  // request so that removing or demoting someone takes effect immediately, not when their token expires.
+  const prisma = getPrismaClient();
+  const membership = await prisma.membership.findUnique({
+    where: { userId_tenantId: { userId: user.id, tenantId: user.tenantId } },
+    select: { role: true },
+  });
+  if (!membership) throw new UnauthorizedError();
+
+  if (action) assertCan(membership.role, action);
   return {
     userId: user.id,
     tenantId: user.tenantId,
-    role: user.role,
-    db: scopedPrisma(getPrismaClient(), user.tenantId),
+    role: membership.role,
+    db: scopedPrisma(prisma, user.tenantId),
   };
 }
 
@@ -40,6 +51,10 @@ export function authErrorResponse(error: unknown): NextResponse | null {
   }
   if (error instanceof ForbiddenError) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (error instanceof LimitError) {
+    // 403 with a machine-readable code, so the UI can show the plan message instead of a generic error.
+    return NextResponse.json({ error: error.code, message: error.message, ...error.detail }, { status: 403 });
   }
   return null;
 }
