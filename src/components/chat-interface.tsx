@@ -52,7 +52,7 @@ const SUGGESTIONS = [
   "Kyoto in cherry blossom season for 2",
 ];
 
-export function ChatInterface() {
+export function ChatInterface({ embedded = false, initialMessage, initialConversationId }: { embedded?: boolean; initialMessage?: string; initialConversationId?: string } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -71,6 +71,14 @@ export function ChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, progress]);
+
+  const sentInitial = useRef(false);
+  useEffect(() => {
+    if (!initialMessage || sentInitial.current) return;
+    sentInitial.current = true;
+    void submit(initialMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -103,6 +111,13 @@ export function ChatInterface() {
     }
   }, []);
 
+  const openedInitial = useRef(false);
+  useEffect(() => {
+    if (!initialConversationId || openedInitial.current) return;
+    openedInitial.current = true;
+    void openConversation(initialConversationId);
+  }, [initialConversationId, openConversation]);
+
   const newChat = () => {
     abortRef.current?.abort();
     setConversationId(null);
@@ -116,9 +131,13 @@ export function ChatInterface() {
 
   const stop = () => abortRef.current?.abort();
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    const userMessage = input.trim();
+    void submit(input);
+  };
+
+  const submit = async (text: string) => {
+    const userMessage = text.trim();
     if (!userMessage || loading) return;
 
     setInput("");
@@ -201,8 +220,8 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] w-full bg-[#f6f7f5]">
-      <aside className="hidden w-64 shrink-0 flex-col gap-3 border-r border-gray-200 bg-white p-3 md:flex" aria-label="Conversations">
+    <div className={`flex w-full bg-[#f6f7f5] ${embedded ? "h-[calc(100dvh-60px)]" : "h-[calc(100dvh-3.5rem)]"}`}>
+      <aside className={`${embedded ? "hidden" : "hidden md:flex"} w-64 shrink-0 flex-col gap-3 border-r border-gray-200 bg-white p-3`} aria-label="Conversations">
         <button
           type="button"
           onClick={newChat}

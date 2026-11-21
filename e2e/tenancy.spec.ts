@@ -42,7 +42,7 @@ test.describe("multi-tenant isolation", () => {
     await page.fill("input[name=email]", b.email);
     await page.fill("input[name=password]", PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL("**/chat");
+    await page.waitForURL((u) => u.pathname === "/");
 
     await page.goto(`${BASE_A}/designer/${id}`);
     // (Next.js also renders its own role=alert route announcer, so target the page's message.)

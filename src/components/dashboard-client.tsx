@@ -80,7 +80,7 @@ export default function DashboardClient() {
           <p className="text-sm text-gray-600">Signed in as {s.role.toLowerCase()}</p>
         </div>
         <nav aria-label="Sections" className="flex flex-wrap gap-2 text-sm">
-          <Link href="/chat" className="rounded border px-3 py-1">Chat</Link>
+          <Link href="/" className="rounded border px-3 py-1">Search</Link>
           <Link href="/designer" className="rounded border px-3 py-1">Trips</Link>
           <Link href="/bookings" className="rounded border px-3 py-1">Bookings</Link>
           {canManageTeam && <Link href="/team" className="rounded border px-3 py-1">Team</Link>}

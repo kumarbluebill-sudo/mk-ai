@@ -37,7 +37,7 @@ test.describe("PWA", () => {
     await page.fill("input[name=email]", email);
     await page.fill("input[name=password]", PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL("**/chat");
+    await page.waitForURL((u) => u.pathname === "/");
 
     await page.goto(`${BASE_A}/dashboard`);
     await expect(page.getByText("Usage")).toBeVisible();
@@ -93,7 +93,7 @@ test.describe("PWA", () => {
     await page.fill("input[name=email]", email);
     await page.fill("input[name=password]", PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL("**/chat");
+    await page.waitForURL((u) => u.pathname === "/");
     for (const path of ["/dashboard", "/designer", "/bookings", "/settings/security", "/team"]) {
       await page.goto(`${BASE_A}${path}`);
       await page.waitForLoadState("networkidle");

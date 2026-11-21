@@ -24,7 +24,7 @@ export default function BookingsList() {
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Bookings</h1>
         <div className="flex gap-2">
-          <Link href="/chat" className="rounded border px-3 py-1 text-sm">Chat</Link>
+          <Link href="/" className="rounded border px-3 py-1 text-sm">Search</Link>
           <Link href="/dashboard" className="rounded border px-3 py-1 text-sm">Dashboard</Link>
           <Link href="/bookings/new" className="rounded bg-blue-600 px-3 py-1 text-sm text-white">New booking</Link>
         </div>

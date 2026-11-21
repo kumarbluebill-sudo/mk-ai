@@ -28,7 +28,7 @@ function LoginForm() {
       return;
     }
     const next = params.get("next");
-    window.location.href = next && next.startsWith("/") && !next.startsWith("//") ? next : "/chat";
+    window.location.href = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
   }
 
   const field = "w-full rounded-lg border px-3.5 py-2.5 text-sm";

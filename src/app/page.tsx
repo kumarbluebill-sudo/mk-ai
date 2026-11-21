@@ -8,60 +8,60 @@ import {
   Home, MapPin, Menu, MessageCircle, MoreHorizontal, Plane, Plus, Search,
   Send, Settings2, ShieldCheck, Sparkles, Users, Wallet, X,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { ChatInterface } from "@/components/chat-interface";
 import { destinations, type Destination } from "@/lib/destinations";
-import { ViatorActivitySearch } from "@/components/viator-activity-search";
 
-type Conversation = { id: string; title: string; date: string; prompt: string };
-const initialTrips: Conversation[] = [
-  { id: "1", title: "A long weekend in Kyoto", date: "Today", prompt: "A long weekend in Kyoto" },
-  { id: "2", title: "Bali with the family", date: "Yesterday", prompt: "Bali with the family" },
-  { id: "3", title: "A quiet escape to Tuscany", date: "Oct 12", prompt: "A quiet escape to Tuscany" },
-];
+type Conversation = { id: string; title: string };
+type ChatSession = { key: number; prompt?: string; conversationId?: string };
 
-const navPrimary = [
-  { label: "Overview", icon: Home }, { label: "New trip", icon: Plus },
-  { label: "Saved trips", icon: Bookmark }, { label: "My quotations", icon: FileText },
-  { label: "My bookings", icon: Plane },
+const navPrimary = [{ label: "Overview", icon: Home }, { label: "Saved trips", icon: Bookmark }];
+const navLinks = [
+  { href: "/designer", label: "Trips & itineraries", icon: Compass },
+  { href: "/bookings", label: "Quotes & bookings", icon: Plane },
+  { href: "/dashboard", label: "Dashboard", icon: FileText },
+  { href: "/team", label: "Team", icon: Users },
 ];
 
 export default function HomePage() {
   const [active, setActive] = useState("Overview");
   const [query, setQuery] = useState("");
-  const [activityQuery, setActivityQuery] = useState("");
+  const [chat, setChat] = useState<ChatSession | null>(null);
   const [drawer, setDrawer] = useState(false);
-  const [trips, setTrips] = useState(initialTrips);
+  const [trips, setTrips] = useState<Conversation[]>([]);
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
   const [selected, setSelected] = useState<Destination | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("mk-travel-conversations");
-    if (saved) try {
-      // Browser-only history is hydrated after the server-rendered view.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTrips(JSON.parse(saved));
-    } catch { /* use examples */ }
     const savedPlaces = localStorage.getItem("mk-travel-saved-places");
     if (savedPlaces) try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSavedSlugs(JSON.parse(savedPlaces));
     } catch { /* use empty list */ }
-  }, []);
+    fetch("/api/chat").then((r) => r.json()).then((d: { conversations?: Conversation[] }) => {
+      if (Array.isArray(d.conversations)) setTrips(d.conversations);
+    }).catch(() => { /* recent trips are optional */ });
+  }, [chat]);
 
+  // The search box is the chat: submitting starts (or continues) a conversation with the agent.
   const handleSearch = (event?: FormEvent) => {
     event?.preventDefault();
-    if (!query.trim()) return;
-    const title = query.trim().length > 32 ? `${query.trim().slice(0, 32)}…` : query.trim();
-    const updatedTrips = [{ id: crypto.randomUUID(), title, date: "Just now", prompt: query.trim() }, ...trips].slice(0, 20);
-    setTrips(updatedTrips);
-    localStorage.setItem("mk-travel-conversations", JSON.stringify(updatedTrips));
-    setActivityQuery(query.trim());
+    const prompt = query.trim();
+    if (!prompt) return;
+    setChat({ key: Date.now(), prompt });
     setActive("New trip");
+    setQuery("");
   };
 
   const startTrip = (prompt: string) => {
-    setQuery(prompt);
+    setSelected(null);
     setActive("New trip");
-    setActivityQuery("");
-    setTimeout(() => document.getElementById("trip-prompt")?.focus(), 10);
+    if (prompt) setChat({ key: Date.now(), prompt });
+    else {
+      setChat(null);
+      setQuery("");
+      setTimeout(() => document.getElementById("trip-prompt")?.focus(), 10);
+    }
   };
 
   const sectionTitle = active === "Overview" ? "A little inspiration goes a long way." : active;
@@ -82,28 +82,27 @@ export default function HomePage() {
         </div>
         <button className="workspace-switch"><div className="workspace-avatar">M</div><span><strong>MK Solutions</strong><small>Travel workspace</small></span><ChevronDown size={15} /></button>
         <button className="new-trip-button" onClick={() => startTrip("")}><Plus size={17} /> Plan a new trip <span>⌘ K</span></button>
-        <Link href="/chat" className="nav-item" style={{ textDecoration: "none" }} onClick={() => setActivityQuery("")}><MessageCircle size={17} /><span>Chat assistant</span></Link>
         <div className="nav-label">WORKSPACE</div>
         <nav className="nav-list">
-          {navPrimary.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${active === label ? "active" : ""}`} onClick={() => { setActive(label); setActivityQuery(""); setSelected(null); setDrawer(false); }}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === "My quotations" && <span className="nav-count">2</span>}</button>)}
+          {navPrimary.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${active === label ? "active" : ""}`} onClick={() => { setActive(label); setChat(null); setSelected(null); setDrawer(false); }}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></button>)}
+          {navLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="nav-item" style={{ textDecoration: "none" }}><Icon size={17} strokeWidth={1.8} /><span>{label}</span></Link>)}
         </nav>
         <div className="sidebar-divider" />
         <div className="section-heading"><span className="nav-label">RECENT TRIPS</span><button className="icon-button tiny" aria-label="More recent trips"><MoreHorizontal size={17} /></button></div>
-        <div className="recent-list">{trips.slice(0, 5).map((trip) => <button key={trip.id} className="recent-item" onClick={() => startTrip(trip.prompt)}><MessageCircle size={15} /><span>{trip.title}</span></button>)}</div>
-        <button className="show-all" onClick={() => setActive("Saved trips")}>View all trips <ArrowRight size={14} /></button>
+        <div className="recent-list">{trips.length === 0 && <span className="recent-item" style={{ cursor: "default" }}>No trips yet</span>}{trips.slice(0, 6).map((trip) => <button key={trip.id} className="recent-item" onClick={() => { setSelected(null); setActive("New trip"); setChat({ key: Date.now(), conversationId: trip.id }); }}><MessageCircle size={15} /><span>{trip.title}</span></button>)}</div>
+        <Link href="/designer" className="show-all" style={{ textDecoration: "none" }}>View all trips <ArrowRight size={14} /></Link>
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setActive("Settings")}><Settings2 size={17} /><span>Settings</span></button>
-          <button className="nav-item" onClick={() => setActive("Help & support")}><CircleHelp size={17} /><span>Help & support</span></button>
-          <div className="profile-card"><div className="profile-avatar">AS</div><span><strong>Alexandra Smith</strong><small>Personal account</small></span><MoreHorizontal size={18} className="muted-icon" /></div>
+          <Link href="/settings/security" className="nav-item" style={{ textDecoration: "none" }}><Settings2 size={17} /><span>Security</span></Link>
+          <button className="nav-item" onClick={() => void signOut({ callbackUrl: "/login" })}><X size={17} /><span>Sign out</span></button>
         </div>
       </aside>
 
       {drawer && <button aria-label="Close navigation" className="drawer-backdrop" onClick={() => setDrawer(false)} />}
 
       <section className="main-area">
-        <header className="topbar"><button aria-label="Open navigation" className="icon-button menu-button" onClick={() => setDrawer(true)}><Menu size={19} /></button><div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{active}</strong></div><div className="top-actions"><div className="secure-label"><ShieldCheck size={14} /> Your trips, thoughtfully planned</div><button className="help-button" onClick={() => setActive("Help & support")}><Headphones size={16} /><span>Get help</span></button><div className="top-avatar">AS</div></div></header>
+        <header className="topbar"><button aria-label="Open navigation" className="icon-button menu-button" onClick={() => setDrawer(true)}><Menu size={19} /></button><div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{active}</strong></div><div className="top-actions"><div className="secure-label"><ShieldCheck size={14} /> Your trips, thoughtfully planned</div></div></header>
 
-        <div className="page-content">
+        {chat ? <ChatInterface key={chat.key} embedded initialMessage={chat.prompt} initialConversationId={chat.conversationId} /> : <div className="page-content">
           {selected ? <DestinationDetail destination={selected} onBack={() => setSelected(null)} onStart={(name) => { setSelected(null); startTrip(`Plan a trip to ${name}`); }} /> : <>
             <section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> MADE FOR THE WAY YOU TRAVEL</div><h1>{active === "Overview" ? <>Travel that feels<br className="desktop-break" /> <em>like you.</em></> : sectionTitle}</h1><p className="welcome-copy">A thoughtful itinerary starts with a conversation.<br className="desktop-break" /> Tell us what you have in mind — we’ll take it from there.</p></div><div className="welcome-stamp"><Globe2 size={18} /><span>Good journeys<br />start with a little wonder.</span></div></section>
 
@@ -111,13 +110,13 @@ export default function HomePage() {
 
             <div className="quick-prompts"><span className="quick-label">NEED A LITTLE INSPIRATION?</span><div className="prompt-chips"><button onClick={() => startTrip("A relaxed beach escape")}>☼ &nbsp;Somewhere by the sea</button><button onClick={() => startTrip("A long weekend in Japan")}>↗ &nbsp;A long weekend away</button><button onClick={() => startTrip("A family trip with the kids")}>♡ &nbsp;A family adventure</button></div></div>
 
-            <section className="destinations-section"><div className="section-title-row"><div><div className="section-kicker">{activityQuery ? "CHECKED WITH VIATOR" : "THE WORLD, AT YOUR PACE"}</div><h2>{activityQuery ? `Live activity ideas for “${activityQuery}”` : "Places worth getting lost in"}</h2></div><button className="view-all" onClick={() => { setQuery(""); setActivityQuery(""); setActive("Overview"); }}>Explore all <ArrowRight size={15} /></button></div>
-              {activityQuery ? <ViatorActivitySearch key={activityQuery} query={activityQuery} /> : visibleDestinations.length ? <div className="destination-grid">{visibleDestinations.slice(0, 3).map((d, i) => <DestinationCard key={d.slug} destination={d} index={i} saved={savedSlugs.includes(d.slug)} onSave={() => toggleSaved(d.slug)} onSelect={() => setSelected(d)} />)}</div> : <div className="empty-results"><Search size={20} /><strong>No saved places yet</strong><span>Tap the bookmark on a destination card to keep it here.</span></div>}
-              {!activityQuery && <div className="demo-note"><span className="demo-dot" /><span><strong>Destination ideas · Demo data</strong> &nbsp;Images and sample budgets are illustrative. No live inventory has been searched.</span><ArrowUpRight size={14} /></div>}
+            <section className="destinations-section"><div className="section-title-row"><div><div className="section-kicker">THE WORLD, AT YOUR PACE</div><h2>Places worth getting lost in</h2></div><button className="view-all" onClick={() => { setQuery(""); setActive("Overview"); }}>Explore all <ArrowRight size={15} /></button></div>
+              {visibleDestinations.length ? <div className="destination-grid">{visibleDestinations.slice(0, 3).map((d, i) => <DestinationCard key={d.slug} destination={d} index={i} saved={savedSlugs.includes(d.slug)} onSave={() => toggleSaved(d.slug)} onSelect={() => setSelected(d)} />)}</div> : <div className="empty-results"><Search size={20} /><strong>No saved places yet</strong><span>Tap the bookmark on a destination card to keep it here.</span></div>}
+              {<div className="demo-note"><span className="demo-dot" /><span><strong>Destination ideas · Demo data</strong> &nbsp;Images and sample budgets are illustrative. No live inventory has been searched.</span><ArrowUpRight size={14} /></div>}
             </section>
             <footer className="page-footer"><span>© 2026 MK Solutions</span><span>Made for memorable journeys <span className="footer-star">✳</span></span><button onClick={() => setActive("Privacy & trust")}>Privacy & trust</button></footer>
           </>}
-        </div>
+        </div>}
       </section>
     </main>
   );
