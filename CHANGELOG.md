@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Phase 7: Traveldesk booking flow (test API)
+- Reserve (free 15-minute hold) -> confirm (supplier charges the agency balance) -> supplier voucher PDF, plus cancel and refresh. Screens: `/bookings`, `/bookings/new`, `/bookings/[id]`.
+- Built from a real run against the test API, which showed: `bookingReference` just echoes our own `referenceNumber`; the supplier's identifier is its numeric booking `id`; a confirmed instant item reports status `PendingVerification` (not `Completed`); cancellation tiers are "hours before pick-up -> refund %" (read off the supplier voucher).
+- Honesty rules enforced in code: price, slot and availability are re-checked server-side (client numbers ignored); CONFIRMED only from a supplier response (`traveldesk-status.ts`); an unknown outcome is never reported as confirmed and a POST is never auto-retried; the user must approve the exact amount (`expectedTotal`) and a price change since the hold blocks the charge; the supplier's own status is shown next to ours; test bookings are labelled TEST; customer payment is shown as "not collected".
+- Safety: new `booking:manage` permission (owner, admin, manager) for confirm/cancel; `Idempotency-Key` required on reserve (replays return the same booking, races included); `TRAVELDESK_ALLOW_LIVE_BOOKING=true` required to book against a production key; Origin check on POST routes; the supplier's anonymous voucher link is never stored or sent to the browser (voucher is proxied).
+- AI still cannot book: `create_booking`, `check_booking_status` and `generate_voucher` stay disabled and point to the Bookings screen.
+- Migration `20261121150000_booking_stages` adds `RESERVED` and `PENDING_SUPPLIER`. 32 new tests (149 total).
+- Not built: customer payment (Razorpay), our own branded voucher, booking from the itinerary/quotation, email/WhatsApp delivery, on-request approval notifications, Viator booking.
+
 ### Traveldesk supplier (test API)
 - New supplier `traveldesk` built from Traveldesk's published OpenAPI (`/swagger/b2bpublic/swagger.json`): tours as activities, live per-date availability with seats left and unit prices. Read endpoints only; reserve/confirm/cancel are not wired.
 - Treated as test data (`SANDBOX`) unless `TRAVELDESK_API_ENV=production`. Coverage is UAE only: searches that do not mention a UAE place return nothing from it, with a note.

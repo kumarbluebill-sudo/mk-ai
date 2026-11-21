@@ -13,6 +13,13 @@ describe("permissions", () => {
     expect(can("SALES", "cost:view")).toBe(false);
   });
 
+  it("only owner, admin and manager can confirm or cancel supplier bookings", () => {
+    for (const r of ["OWNER", "ADMIN", "MANAGER"] as const) expect(can(r, "booking:manage")).toBe(true);
+    for (const r of ["CONSULTANT", "SALES", "ACCOUNTS", "READONLY"] as const) expect(can(r, "booking:manage")).toBe(false);
+    // Consultants can still reserve (a short, free hold).
+    expect(can("CONSULTANT", "booking:create")).toBe(true);
+  });
+
   it("missing role is denied", () => {
     expect(can(undefined, "chat:use")).toBe(false);
     expect(() => assertCan(null, "chat:use")).toThrow(ForbiddenError);

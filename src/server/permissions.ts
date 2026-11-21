@@ -18,6 +18,8 @@ export type Action =
   | "quotation:write"
   | "booking:read"
   | "booking:create"
+  /** Confirm or cancel a supplier booking. Confirming spends the agency balance with the supplier. */
+  | "booking:manage"
   | "payment:read"
   | "payment:manage"
   | "supplier:manage"
@@ -34,6 +36,7 @@ const ALL: Action[] = [
   "quotation:write",
   "booking:read",
   "booking:create",
+  "booking:manage",
   "payment:read",
   "payment:manage",
   "supplier:manage",
@@ -55,6 +58,7 @@ const MATRIX: Record<TenantRoleName, readonly Action[]> = {
     "quotation:write",
     "booking:read",
     "booking:create",
+    "booking:manage",
     "payment:read",
     "markup:manage",
     "cost:view",

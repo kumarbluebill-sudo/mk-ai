@@ -42,6 +42,8 @@ enum BookingStatus {
   FAILED
   CANCELLED
   REFUNDED
+  RESERVED
+  PENDING_SUPPLIER
 }
 enum PaymentStatus {
   CREATED

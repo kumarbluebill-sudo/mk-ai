@@ -193,7 +193,10 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
           <h1 className="text-2xl font-semibold">{itinerary.title}</h1>
           <p className="text-sm text-gray-600">{itinerary.destination}{itinerary.startDate ? ` · starts ${itinerary.startDate}` : ""}</p>
         </div>
-        <Link href="/chat" className="rounded border px-3 py-1 text-sm">Back to chat</Link>
+        <div className="flex gap-2">
+          <Link href="/bookings" className="rounded border px-3 py-1 text-sm">Bookings</Link>
+          <Link href="/chat" className="rounded border px-3 py-1 text-sm">Back to chat</Link>
+        </div>
       </header>
 
       {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}

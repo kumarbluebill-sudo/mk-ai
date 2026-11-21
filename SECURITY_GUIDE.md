@@ -20,9 +20,14 @@
 | Cost/margin hidden from roles without `cost:view` | pricing tools |
 | `/debug` blocked in production | `src/app/debug/layout.tsx` |
 | Tool results treated as data in the AI system prompt | `src/server/ai/agent.ts` |
+| Booking money safety: `booking:manage` for confirm/cancel, exact-amount approval, price re-check, live-booking switch, idempotency keys | `src/server/booking/*`, `TRAVELDESK_ALLOW_LIVE_BOOKING` |
+| CSRF defence on booking POSTs (Origin check, plus SameSite cookies) | `src/server/same-origin.ts` |
+| Supplier voucher link (contains an anonymous-access guid) never stored or sent to the browser | `getVoucher` proxies the PDF |
 
 ## Known gaps (do before production)
 
+- **Booking has no customer payment step.** Confirming charges the agency's balance with the supplier. Do not enable live bookings until Razorpay (or another collection step) exists.
+- The CSRF Origin check is applied to the booking routes only; apply it to every state-changing route before production.
 - **Rate limiting is per-process memory**; use Redis before running more than one instance.
 - **MFA is optional per user**, not enforceable per tenant yet; there are no recovery codes (a user who loses their authenticator must be reset directly in the database); a TOTP code can be reused within its ~90s window.
 - **No CSRF token** beyond Auth.js defaults and same-site cookies; review for any cross-site embedding.

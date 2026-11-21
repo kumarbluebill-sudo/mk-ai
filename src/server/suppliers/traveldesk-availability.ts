@@ -17,6 +17,10 @@ export interface AvailabilityInput {
 export interface SlotResult {
   startTime: string | null;
   endTime: string | null;
+  /** Raw supplier values; a reservation must copy them from the slot that was picked. */
+  timeSlotId: number | null;
+  startMinutes: number | null;
+  endMinutes: number | null;
   available: boolean;
   /** Seats the supplier reports as left, if it says. */
   left: number | null;
@@ -32,6 +36,11 @@ export interface SlotResult {
 export interface OfferAvailability {
   offerId: number;
   name: string;
+  /** 0 OnRequest (supplier must approve), 1 LiveBook (instant), 2 TicketOnly. */
+  bookingType: number | null;
+  /** False means a pick-up hotel is required to book. */
+  isDirectReporting: boolean | null;
+  infantsAllowed: boolean | null;
   withinPaxLimits: boolean;
   slots: SlotResult[];
 }
@@ -74,6 +83,9 @@ export function slotFromRow(row: TravelDeskAvailabilityRow, pax: { adults: numbe
   return {
     startTime: minutesToClock(row.availability.startTime),
     endTime: minutesToClock(row.availability.endTime),
+    timeSlotId: row.availability.timeSlotId ?? null,
+    startMinutes: row.availability.startTime ?? null,
+    endMinutes: row.availability.endTime ?? null,
     available: price?.isBookable !== false && (left === null || left >= people) && withinLimits && total !== null,
     left,
     pricePerAdult: perAdult,
@@ -103,6 +115,9 @@ export async function checkTravelDeskAvailability(client: TravelDeskClient, inpu
       return {
         offerId: offer.id,
         name: offer.name,
+        bookingType: offer.bookingType ?? null,
+        isDirectReporting: offer.isDirectReporting ?? null,
+        infantsAllowed: offer.infantsAllowed ?? null,
         withinPaxLimits,
         slots: sameDay.map((r) => slotFromRow(r, input, withinPaxLimits)),
       };

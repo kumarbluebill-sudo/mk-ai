@@ -377,10 +377,10 @@ export const TOOLS: ToolDefinition[] = [
   notConfigured("compare_inventory", "Requires more than one connected supplier"),
   notConfigured("optimize_itinerary", "Requires a maps/routing provider for real distances and travel times"),
   notConfigured("verify_inventory", "Use check_availability for Viator products; no other supplier is connected"),
-  notConfigured("create_booking", "Supplier reservations and payment are not enabled yet; nothing can be booked"),
-  notConfigured("check_booking_status", "No bookings can be created yet"),
+  notConfigured("create_booking", "The assistant cannot reserve, confirm or cancel bookings. A person makes Traveldesk test bookings on the Bookings screen; tell the user to open it"),
+  notConfigured("check_booking_status", "Booking status is shown on the Bookings screen, not through the assistant"),
   notConfigured("process_payment", "Payment gateway (Razorpay) is not configured"),
-  notConfigured("generate_voucher", "Vouchers can only be generated after a real supplier confirmation"),
+  notConfigured("generate_voucher", "Vouchers are the supplier's own PDFs, downloaded by a person from a confirmed booking on the Bookings screen"),
   notConfigured("send_travel_documents", "Email/WhatsApp delivery and PDF generation are not configured"),
 ];
 

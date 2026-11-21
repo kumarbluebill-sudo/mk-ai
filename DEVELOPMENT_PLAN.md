@@ -8,7 +8,7 @@
 | 4 | Supplier adapter framework, parallel live search, availability verification | **Framework and parallel search done** (Viator only). Availability verification across suppliers and a second real supplier need official docs/credentials |
 | 5 | Day-wise itinerary designer, icons, drag-and-drop, maps/routing | **Basics done**: manual designer, map, straight-line estimates. Not done: drag-and-drop, category icons, real routing (needs a maps provider and key), geocoding (items get coordinates only when entered), commercial map tiles before heavy traffic (OSM public tiles are for light use) |
 | 6 | Pricing/markup/GST engine, branded PDFs | **Done (basics)**: GST split, immutable snapshot, customer PDF. Not done: Unicode fonts (rupee sign, Indian scripts), logo and bank details on the PDF, quotation edit/versioning/status workflow, sending by email/WhatsApp, TCS rules (need an accountant's input), per-supplier markup rules UI |
-| 7 | Booking, Razorpay payments, webhooks, vouchers | Next cycle |
+| 7 | Booking, Razorpay payments, webhooks, vouchers | **Half done**: Traveldesk reserve/confirm/cancel/voucher against the test API. Not done: Razorpay and customer payment collection (the agency fronts the supplier cost today), webhooks, our own branded voucher, booking from a quotation/itinerary, notifications. Before going live: confirm with Traveldesk what status `PendingVerification` means after confirm, and get production access |
 | 8 | Subscriptions, usage limits, tenant dashboard, super admin | Later |
 | 9 | PWA (service worker), Capacitor Android | Later |
 | 10 | E2E tests, staging/production deployment | Later |
