@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { createQuotation, QuotationError, quoteOptionsSchema, visiblePrice } from "@/server/quotation/service";
+import { getTravelDeskClient, TravelDeskError } from "@/integrations/traveldesk/client";
+import { checkTravelDeskAvailability } from "@/server/suppliers/traveldesk-availability";
 import { searchInventory } from "@/server/suppliers/search";
 import { getViatorClient } from "@/integrations/viator/client";
 import { searchDestinations } from "@/lib/destinations";
@@ -158,7 +160,7 @@ export const TOOLS: ToolDefinition[] = [
   define({
     name: "search_activities",
     description:
-      "Search live Viator activities/tours by keyword (include the city, e.g. 'Dubai desert safari'). Prices come from the supplier; check 'liveInventory' and 'environment' before calling them live.",
+      "Search activities/tours across all connected suppliers (Viator, Traveldesk for the UAE) by keyword (include the city, e.g. 'Dubai desert safari'). Each result has a supplier and id; pass them to check_availability. Prices come from the suppliers; 'liveInventory' false or dataStatus SANDBOX means test data, never call it live.",
     schema: z.object({
       keyword: z.string().min(2).max(200),
       startDate: dateSchema.optional(),
@@ -217,8 +219,9 @@ export const TOOLS: ToolDefinition[] = [
   define({
     name: "check_availability",
     description:
-      "Check live Viator availability and price for a product on a date. Use before presenting a price as current.",
+      "Check live availability and price for a product on a date. Set supplier to the item's supplier from search_activities (viator or traveldesk). For traveldesk, productCode is the tour id and productOptionCode (optional) is an offer id. Use before presenting a price as current. Results with liveInventory=false are test data.",
     schema: z.object({
+      supplier: z.enum(["viator", "traveldesk"]).default("viator"),
       productCode: z.string().min(1).max(100),
       date: dateSchema,
       adults: z.number().int().min(1).max(15),
@@ -227,6 +230,30 @@ export const TOOLS: ToolDefinition[] = [
       productOptionCode: z.string().max(100).optional(),
     }),
     execute: async (i) => {
+      if (i.supplier === "traveldesk") {
+        const tourId = Number(i.productCode);
+        const offerId = i.productOptionCode ? Number(i.productOptionCode) : undefined;
+        if (!Number.isInteger(tourId) || (offerId !== undefined && !Number.isInteger(offerId))) {
+          return { ok: false, error: "INVALID_PRODUCT_CODE", detail: "Traveldesk tour and offer ids are numbers." };
+        }
+        let client;
+        try {
+          client = getTravelDeskClient();
+        } catch (error) {
+          return { ok: false, error: "SUPPLIER_NOT_CONFIGURED", detail: error instanceof Error ? error.message : "" };
+        }
+        try {
+          const a = await checkTravelDeskAvailability(client, { tourId, date: i.date, adults: i.adults, children: i.children, offerId });
+          return {
+            source: "TRAVELDESK",
+            liveInventory: a.environment === "production",
+            ...a,
+            note: "Totals are computed from the supplier's unit prices. Currency is USD. Nothing has been reserved.",
+          };
+        } catch (error) {
+          return { ok: false, error: "SUPPLIER_ERROR", detail: error instanceof TravelDeskError ? error.message : "Traveldesk request failed" };
+        }
+      }
       const r = await viatorCall((c) =>
         c.checkAvailability(i.productCode, i.date, { adults: i.adults, children: i.children }, i.currency, i.productOptionCode)
       );

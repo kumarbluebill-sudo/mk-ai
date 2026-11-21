@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Traveldesk supplier (test API)
+- New supplier `traveldesk` built from Traveldesk's published OpenAPI (`/swagger/b2bpublic/swagger.json`): tours as activities, live per-date availability with seats left and unit prices. Read endpoints only; reserve/confirm/cancel are not wired.
+- Treated as test data (`SANDBOX`) unless `TRAVELDESK_API_ENV=production`. Coverage is UAE only: searches that do not mention a UAE place return nothing from it, with a note.
+- `check_availability` AI tool takes `supplier` (viator|traveldesk); new `GET /api/suppliers/traveldesk/availability`.
+- Response schemas are tolerant (a real response had null category names, caught by testing against the live API). 19 new tests (117 total).
+
 ### Phase 6: pricing, GST and PDF quotations
 - Pricing engine: Indian GST split (CGST+SGST within a state, IGST across states) with exact-paisa halves; rate is always supplied by the user, no statutory rates or TCS are assumed. Breakdown now has `taxable` and `taxLines`.
 - Quotation service shared by the AI tool and the API: creates a DRAFT quotation and stores an immutable `snapshot` (migration `20261121120000_quotation_snapshot`).

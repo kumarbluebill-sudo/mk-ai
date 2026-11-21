@@ -70,6 +70,8 @@ export interface SupplierOutcome {
 export interface AdapterResult {
   items: InventoryItem[];
   environment: string;
+  /** Shown to users next to this supplier's status, e.g. coverage or currency caveats. */
+  note?: string;
 }
 
 export interface SupplierAdapter {

@@ -36,6 +36,7 @@ interface CacheEntry {
   at: number;
   items: InventoryItem[];
   environment: string;
+  note?: string;
 }
 const cache = new Map<string, CacheEntry>();
 
@@ -78,7 +79,7 @@ async function runAdapter(
   if (useCache) {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
-      return done({ status: "OK", itemCount: hit.items.length, environment: hit.environment, cached: true }, hit.items);
+      return done({ status: "OK", itemCount: hit.items.length, environment: hit.environment, cached: true, message: hit.note }, hit.items);
     }
   }
 
@@ -96,8 +97,8 @@ async function runAdapter(
     if (result === "timeout") {
       return done({ status: "TIMEOUT", itemCount: 0, message: `${adapter.displayName} did not answer within ${timeoutMs / 1000}s.` });
     }
-    remember(key, { at: Date.now(), items: result.items, environment: result.environment });
-    return done({ status: "OK", itemCount: result.items.length, environment: result.environment }, result.items);
+    remember(key, { at: Date.now(), items: result.items, environment: result.environment, note: result.note });
+    return done({ status: "OK", itemCount: result.items.length, environment: result.environment, message: result.note }, result.items);
   } catch (error) {
     if (controller.signal.aborted) {
       return done({ status: "TIMEOUT", itemCount: 0, message: `${adapter.displayName} did not answer within ${timeoutMs / 1000}s.` });

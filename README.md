@@ -12,7 +12,7 @@ Multi-tenant AI travel planning SaaS by MK Solutions. Travel agencies register t
 - Itinerary designer (`/designer`): edit trips manually or after the AI builds them, reorder, optimise stop order, map with straight-line travel estimates.
 - Supplier adapter framework (`src/server/suppliers`): normalised inventory, parallel search with per-supplier timeout, failure isolation, 60s cache, price/rating ranking, budget filter. `GET /api/suppliers/search` and `/api/suppliers/status`.
 - Itinerary editing by targeted patches, pricing with markup/tax in exact minor units, draft quotations.
-- Docker, docker-compose, CI workflow, health check, 98 unit tests.
+- Docker, docker-compose, CI workflow, health check, 117 unit tests.
 
 ## What does NOT exist yet
 

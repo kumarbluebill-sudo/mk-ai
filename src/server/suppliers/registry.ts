@@ -1,9 +1,10 @@
 import { klookAdapter, yatraAdapter } from "./pending-adapters";
 import type { InventoryCategory, SupplierAdapter } from "./types";
+import { traveldeskAdapter } from "./traveldesk-adapter";
 import { viatorAdapter } from "./viator-adapter";
 
 /** Add new supplier adapters here, nowhere else. */
-export const ALL_ADAPTERS: readonly SupplierAdapter[] = [viatorAdapter, yatraAdapter, klookAdapter];
+export const ALL_ADAPTERS: readonly SupplierAdapter[] = [viatorAdapter, traveldeskAdapter, yatraAdapter, klookAdapter];
 
 export function adaptersForCategory(
   category: InventoryCategory,
