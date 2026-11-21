@@ -301,7 +301,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
         </div>
         <div className="flex gap-2">
           <Link href="/bookings" className="rounded border px-3 py-1 text-sm">Bookings</Link>
-          <Link href="/chat" className="rounded border px-3 py-1 text-sm">Back to chat</Link>
+          <Link href="/" className="rounded border px-3 py-1 text-sm">Back to search</Link>
         </div>
       </header>
 

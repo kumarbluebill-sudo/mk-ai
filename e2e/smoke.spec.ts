@@ -26,7 +26,7 @@ test.describe("smoke", () => {
   });
 
   test("protected pages redirect to sign-in and protected APIs answer 401", async ({ request }) => {
-    for (const path of ["/chat", "/dashboard", "/designer", "/bookings", "/team", "/admin", "/settings/security"]) {
+    for (const path of ["/", "/chat", "/dashboard", "/designer", "/bookings", "/team", "/admin", "/settings/security"]) {
       const res = await request.get(path, { maxRedirects: 0 });
       expect(res.status(), path).toBe(307);
       expect(res.headers().location, path).toContain("/login");

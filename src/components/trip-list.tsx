@@ -61,7 +61,7 @@ export default function TripList() {
     <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Itinerary designer</h1>
-        <Link href="/chat" className="rounded border px-3 py-1 text-sm">Chat</Link>
+        <Link href="/" className="rounded border px-3 py-1 text-sm">Search</Link>
       </header>
 
       <form onSubmit={create} className="grid gap-2 rounded border p-4 sm:grid-cols-4">
