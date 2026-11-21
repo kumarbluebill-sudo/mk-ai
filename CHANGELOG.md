@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Mapbox (finishes phase 5)
+- Map tiles are Mapbox's when a public (pk.) token is configured (OpenStreetMap otherwise). The token is served only to signed-in users and a secret (sk.) token is never sent to the browser.
+- Real driving legs per day via Mapbox Directions (`GET /api/itineraries/[id]/routes`); legs and day totals are labelled "Mapbox", straight-line guesses stay labelled "estimate". Example: Burj Khalifa to Dubai Marina is 22 km / 21 min by road, the straight-line estimate said 25 km / 50 min.
+- "Find on map" place search in the item form (`GET /api/maps/geocode`) using the Search Box API, because Geocoding v6 has no tourist places ("Dubai Frame" returned a street). Results are biased towards the trip's existing stops.
+- Mapbox results are never cached on the server. Check Mapbox's terms for your plan before keeping searched coordinates long-term (typed-in coordinates are always fine).
+- Not done: Mapbox-based stop ordering (Optimise order is still straight-line), walking legs, multi-day routes, geocoding of existing items.
+- 13 new tests (161 total).
+
 ### Phase 7: Traveldesk booking flow (test API)
 - Reserve (free 15-minute hold) -> confirm (supplier charges the agency balance) -> supplier voucher PDF, plus cancel and refresh. Screens: `/bookings`, `/bookings/new`, `/bookings/[id]`.
 - Built from a real run against the test API, which showed: `bookingReference` just echoes our own `referenceNumber`; the supplier's identifier is its numeric booking `id`; a confirmed instant item reports status `PendingVerification` (not `Completed`); cancellation tiers are "hours before pick-up -> refund %" (read off the supplier voucher).

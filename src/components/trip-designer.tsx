@@ -30,6 +30,20 @@ const STATUS_HELP: Record<ItineraryItem["status"], string> = {
   UNVERIFIED: "Not checked with any supplier",
 };
 
+export interface MapsConfig {
+  provider: "mapbox" | "osm";
+  token: string | null;
+  routing: boolean;
+  geocoding: boolean;
+}
+
+interface Candidate {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
 interface View {
   title: string;
   itinerary: Itinerary | null;
@@ -82,8 +96,40 @@ function fromForm(f: FormState, base?: ItineraryItem): Omit<ItineraryItem, "id">
   };
 }
 
-function ItemForm(props: { initial: FormState; submitLabel: string; onSubmit: (f: FormState) => void; onCancel?: () => void }) {
+function ItemForm(props: {
+  initial: FormState;
+  submitLabel: string;
+  onSubmit: (f: FormState) => void;
+  onCancel?: () => void;
+  maps: MapsConfig | null;
+  /** A known point on the trip, used to bias place search towards the destination. */
+  near?: { lat: number; lng: number };
+}) {
   const [f, setF] = useState(props.initial);
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  async function findOnMap() {
+    setSearching(true);
+    setSearchError(null);
+    setCandidates(null);
+    try {
+      const q = new URLSearchParams({ q: f.location.trim() || f.title.trim() });
+      if (props.near) {
+        q.set("nearLat", String(props.near.lat));
+        q.set("nearLng", String(props.near.lng));
+      }
+      const res = await fetch(`/api/maps/geocode?${q}`);
+      const data = (await res.json()) as { candidates?: Candidate[]; message?: string; error?: string };
+      if (!res.ok) throw new Error(data.message ?? "Search is not available right now");
+      setCandidates(data.candidates ?? []);
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  }
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((p) => ({ ...p, [k]: v }));
   const input = "rounded border px-2 py-1 text-sm";
   return (
@@ -100,7 +146,29 @@ function ItemForm(props: { initial: FormState; submitLabel: string; onSubmit: (f
       </select>
       <input className={input} type="time" value={f.startTime} onChange={(e) => set("startTime", e.target.value)} aria-label="Start time" />
       <input className={input} type="time" value={f.endTime} onChange={(e) => set("endTime", e.target.value)} aria-label="End time" />
-      <input className={`${input} sm:col-span-4`} placeholder="Location (name)" maxLength={200} value={f.location} onChange={(e) => set("location", e.target.value)} aria-label="Location" />
+      <input className={`${input} ${props.maps?.geocoding ? "sm:col-span-3" : "sm:col-span-4"}`} placeholder="Location (name)" maxLength={200} value={f.location} onChange={(e) => set("location", e.target.value)} aria-label="Location" />
+      {props.maps?.geocoding && (
+        <button type="button" disabled={searching || (f.location.trim() + f.title.trim()).length < 2} onClick={() => void findOnMap()} className="rounded border px-2 py-1 text-sm disabled:opacity-50">
+          {searching ? "Searching…" : "Find on map"}
+        </button>
+      )}
+      {searchError && <p role="alert" className="text-xs text-red-700 sm:col-span-6">{searchError}</p>}
+      {candidates && (
+        <ul className="space-y-1 sm:col-span-6" aria-label="Place results">
+          {candidates.length === 0 && <li className="text-xs text-gray-600">No places found. Try a more specific name.</li>}
+          {candidates.map((c, i) => (
+            <li key={`${c.lat}-${c.lng}-${i}`} className="flex items-center justify-between gap-2 rounded border bg-white p-1.5 text-xs">
+              <span><strong>{c.name}</strong> <span className="text-gray-600">{c.address}</span></span>
+              <button type="button" className="rounded border px-2 py-0.5" onClick={() => { setF((p) => ({ ...p, location: c.name, lat: String(c.lat), lng: String(c.lng) })); setCandidates(null); }}>
+                Use
+              </button>
+            </li>
+          ))}
+          {candidates.length > 0 && (
+            <li className="text-xs text-gray-500">Results come from Mapbox search. Check Mapbox&apos;s terms for your plan before keeping coordinates long-term.</li>
+          )}
+        </ul>
+      )}
       <input className={input} inputMode="decimal" placeholder="Latitude" value={f.lat} onChange={(e) => set("lat", e.target.value)} aria-label="Latitude" />
       <input className={input} inputMode="decimal" placeholder="Longitude" value={f.lng} onChange={(e) => set("lng", e.target.value)} aria-label="Longitude" />
       <input className={input} inputMode="decimal" placeholder="Price (optional)" value={f.price} onChange={(e) => set("price", e.target.value)} aria-label="Price" />
@@ -127,6 +195,22 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
   const [mapDay, setMapDay] = useState(1);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState<number | null>(null);
+  const [maps, setMaps] = useState<MapsConfig | null>(null);
+  // Real (Mapbox) driving legs, tagged with the itinerary shape they were computed for.
+  const [routed, setRouted] = useState<{ key: string; routes: Record<number, DayRoute> } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/maps/config")
+      .then(async (r) => (r.ok ? ((await r.json()) as MapsConfig) : null))
+      .then((c) => {
+        if (!cancelled) setMaps(c);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +253,28 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
   }
 
   const itinerary = view?.itinerary ?? null;
+  // Changes whenever the order or coordinates of stops change, so stale routes are never shown.
+  const routeKey = useMemo(
+    () => JSON.stringify(itinerary?.days.map((d) => d.items.map((i) => [i.id, i.lat ?? null, i.lng ?? null]))),
+    [itinerary]
+  );
+  const routing = maps?.routing === true;
+  useEffect(() => {
+    if (!routing || !itinerary) return;
+    let cancelled = false;
+    fetch(`/api/itineraries/${conversationId}/routes`)
+      .then(async (r) => (r.ok ? ((await r.json()) as { routes: Record<number, DayRoute> }) : null))
+      .then((data) => {
+        if (!cancelled && data) setRouted({ key: routeKey, routes: data.routes });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // routeKey captures every change that matters; itinerary itself changes identity on each save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routing, routeKey, conversationId]);
+  const liveRoutes = routed && routed.key === routeKey ? routed.routes : null;
   const day: ItineraryDay | undefined = itinerary?.days.find((d) => d.dayNumber === mapDay) ?? itinerary?.days[0];
   const points = useMemo(
     () => (day?.items ?? []).flatMap((i) => (i.lat !== undefined && i.lng !== undefined ? [{ id: i.id, title: i.title, lat: i.lat, lng: i.lng }] : [])),
@@ -201,8 +307,10 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
 
       {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <p className="text-xs text-gray-500">
-        Distances and times are straight-line estimates, not routed journeys. Items you add here are never marked as
-        supplier-verified.
+        {routing
+          ? "Legs marked Mapbox are real driving routes; anything else is a straight-line estimate. "
+          : "Distances and times are straight-line estimates, not routed journeys. "}
+        Items you add here are never marked as supplier-verified.
       </p>
 
       <section aria-label="Map" className="space-y-2">
@@ -215,11 +323,12 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
             </button>
           ))}
         </div>
-        <TripMap points={points} />
+        <TripMap points={points} token={maps?.token ?? null} />
       </section>
 
       {itinerary.days.map((d) => {
-        const route = view?.routes[d.dayNumber];
+        const route = liveRoutes?.[d.dayNumber] ?? view?.routes[d.dayNumber];
+        const nearPoint = d.items.find((i) => i.lat !== undefined && i.lng !== undefined);
         const legByTo = new Map(route?.legs.map((l) => [l.toId, l]));
         const located = d.items.filter((i) => i.lat !== undefined && i.lng !== undefined).length;
         return (
@@ -252,7 +361,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
             </div>
             {route && route.legs.length > 0 && (
               <p className="text-xs text-gray-500">
-                ~{route.totalKm} km, ~{route.totalMinutes} min of travel between located stops (estimate)
+                ~{route.totalKm} km, ~{route.totalMinutes} min of travel between located stops ({route.legs[0]?.source === "MAPBOX" ? "driving, Mapbox" : "estimate"})
                 {route.unlocated > 0 ? ` · ${route.unlocated} item(s) without coordinates not counted` : ""}
               </p>
             )}
@@ -265,11 +374,11 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
                   <li key={item.id}>
                     {leg && (
                       <p className="mb-1 ml-3 text-xs text-gray-500">
-                        ↓ ~{leg.travel.minutes} min {leg.travel.mode === "walk" ? "walk" : "by road"}, ~{leg.travel.distanceKm} km (estimate)
+                        ↓ ~{leg.travel.minutes} min {leg.travel.mode === "walk" ? "walk" : "by road"}, ~{leg.travel.distanceKm} km ({leg.source === "MAPBOX" ? "Mapbox" : "estimate"})
                       </p>
                     )}
                     {editing === item.id ? (
-                      <ItemForm initial={toForm(item)} submitLabel="Save" onCancel={() => setEditing(null)}
+                      <ItemForm initial={toForm(item)} submitLabel="Save" maps={maps} near={nearPoint && nearPoint.lat !== undefined && nearPoint.lng !== undefined ? { lat: nearPoint.lat, lng: nearPoint.lng } : undefined} onCancel={() => setEditing(null)}
                         onSubmit={(f) => void send([{ op: "replace_item", itemId: item.id, item: fromForm(f, item) }])} />
                     ) : (
                       <div className="flex flex-wrap items-start justify-between gap-2 rounded border p-2">
@@ -305,7 +414,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
             </ol>
 
             {adding === d.dayNumber ? (
-              <ItemForm initial={blankForm} submitLabel="Add item" onCancel={() => setAdding(null)}
+              <ItemForm initial={blankForm} submitLabel="Add item" maps={maps} near={nearPoint && nearPoint.lat !== undefined && nearPoint.lng !== undefined ? { lat: nearPoint.lat, lng: nearPoint.lng } : undefined} onCancel={() => setAdding(null)}
                 onSubmit={(f) => void send([{ op: "add_item", day: d.dayNumber, item: fromForm(f) }])} />
             ) : (
               <button onClick={() => setAdding(d.dayNumber)} className="rounded border px-3 py-1 text-sm">+ Add item</button>

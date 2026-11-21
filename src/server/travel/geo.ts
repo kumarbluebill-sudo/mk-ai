@@ -38,7 +38,8 @@ export interface TravelEstimate {
   /** Estimated road/walking distance, rounded to 0.1 km. */
   distanceKm: number;
   minutes: number;
-  estimate: true;
+  /** True for straight-line guesses; false for legs routed by a maps provider. */
+  estimate: boolean;
 }
 
 export function estimateTravel(a: LatLng, b: LatLng): TravelEstimate {
@@ -85,6 +86,8 @@ export interface RouteLeg {
   fromId: string;
   toId: string;
   travel: TravelEstimate;
+  /** Where the numbers came from. */
+  source: "ESTIMATE" | "MAPBOX";
 }
 
 export interface DayRoute {
@@ -108,6 +111,7 @@ export function dayRoute(items: readonly { id: string; lat?: number; lng?: numbe
       fromId: located[i - 1].id,
       toId: located[i].id,
       travel: estimateTravel(located[i - 1], located[i]),
+      source: "ESTIMATE",
     });
   }
   return {
