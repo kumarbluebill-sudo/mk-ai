@@ -6,7 +6,7 @@ const CSP = [
   // Google Fonts are loaded by globals.css (self-hosting them with next/font would remove this dependency).
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Map tiles (Mapbox, OpenStreetMap fallback) and supplier images (Traveldesk blob storage).
-  "img-src 'self' data: blob: https://api.mapbox.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.blob.core.windows.net",
+  "img-src 'self' data: blob: https://images.unsplash.com https://api.mapbox.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.blob.core.windows.net",
   "font-src 'self' data: https://fonts.gstatic.com",
   "connect-src 'self' https://api.mapbox.com https://events.mapbox.com",
   "worker-src 'self'",
