@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AppNav } from "@/components/app-nav";
 import { InstallPrompt, OfflineBanner, PwaRegister } from "@/components/pwa";
 import "./globals.css";
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <OfflineBanner />
+        <AppNav />
         {children}
         <InstallPrompt />
         <PwaRegister />

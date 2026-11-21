@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Bot, FileText, Map as MapIcon, Plus, Sparkles, Square, TriangleAlert } from "lucide-react";
 import { ViatorActivitySearch } from "@/components/viator-activity-search";
 import type { Itinerary } from "@/server/travel/itinerary";
 
@@ -38,11 +39,18 @@ const TOOL_LABELS: Record<string, string> = {
   create_quotation: "Preparing a draft quotation",
 };
 
-const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
-  LIVE: { bg: "#dcfce7", fg: "#166534" },
-  ESTIMATE: { bg: "#fef9c3", fg: "#854d0e" },
-  UNVERIFIED: { bg: "#e5e7eb", fg: "#374151" },
+const STATUS_CLASS: Record<string, string> = {
+  LIVE: "bg-emerald-100 text-emerald-800",
+  ESTIMATE: "bg-amber-100 text-amber-800",
+  UNVERIFIED: "bg-gray-200 text-gray-700",
 };
+
+const SUGGESTIONS = [
+  "5 days in Dubai for 2 adults and 1 child",
+  "Bali honeymoon, 6 nights, mid-range budget",
+  "Weekend in Jaipur for a family of 4",
+  "Kyoto in cherry blossom season for 2",
+];
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -58,6 +66,7 @@ export function ChatInterface() {
   const [sendError, setSendError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,223 +195,215 @@ export function ChatInterface() {
     }
   };
 
+  const send = (text: string) => {
+    setInput(text);
+    inputRef.current?.focus();
+  };
+
   return (
-    <div style={styles.shell}>
-      <aside style={styles.sidebar} aria-label="Conversations">
-        <button type="button" onClick={newChat} style={styles.newChat}>
-          + New chat
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full bg-[#f6f7f5]">
+      <aside className="hidden w-64 shrink-0 flex-col gap-3 border-r border-gray-200 bg-white p-3 md:flex" aria-label="Conversations">
+        <button
+          type="button"
+          onClick={newChat}
+          className="flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
+        >
+          <Plus size={16} /> New chat
         </button>
-        <div style={styles.sidebarList}>
+        <p className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Recent</p>
+        <div className="flex flex-col gap-0.5 overflow-y-auto">
           {conversations.map((c) => (
             <button
               key={c.id}
               type="button"
               onClick={() => void openConversation(c.id)}
-              style={{ ...styles.sidebarItem, backgroundColor: c.id === conversationId ? "#dbeafe" : "transparent" }}
+              className={`truncate rounded-lg px-3 py-2 text-left text-sm transition ${
+                c.id === conversationId ? "bg-brand-50 font-medium text-brand-800" : "text-gray-600 hover:bg-gray-100"
+              }`}
             >
               {c.title}
             </button>
           ))}
-          {conversations.length === 0 && <p style={styles.sidebarEmpty}>No conversations yet</p>}
+          {conversations.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">No conversations yet</p>}
         </div>
       </aside>
 
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <h2 style={{ margin: 0 }}>MK AI Travel Assistant</h2>
-          <p style={{ margin: "4px 0 0" }}>Plan your trip with live supplier data where available</p>
-          <p style={{ margin: "8px 0 0", fontSize: 14 }}>
-            <Link href="/designer" style={{ color: "#2563eb" }}>Trips</Link>
-            {" · "}
-            <Link href="/bookings" style={{ color: "#2563eb" }}>Bookings</Link>
-            {" · "}
-            <Link href="/dashboard" style={{ color: "#2563eb" }}>Dashboard</Link>
-          </p>
+      <section className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-5 py-3">
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-800 text-white"><Bot size={18} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold text-gray-900">MK AI Travel Agent</h2>
+            <p className="truncate text-xs text-gray-500">Tell me the place, dates and travellers. I search live supplier inventory and build the quotation.</p>
+          </div>
+          <button type="button" onClick={newChat} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 md:hidden">
+            New chat
+          </button>
         </div>
 
         {fallbackMode && (
-          <p role="status" style={styles.notice}>
+          <p role="status" className="flex items-center gap-2 bg-amber-50 px-5 py-2 text-xs text-amber-800">
+            <TriangleAlert size={14} className="shrink-0" />
             The AI planner is not configured on this server. Replies are basic scripted guidance, not live search or pricing.
           </p>
         )}
 
-        <div style={styles.messagesArea}>
-          {historyError && (
-            <p role="alert" style={styles.error}>
-              {historyError}
-            </p>
-          )}
-          {messages.length === 0 && (
-            <div style={styles.welcomeMessage}>
-              <p>Tell me where you&apos;d like to go and I&apos;ll help you plan it.</p>
-              <p style={{ fontSize: 13 }}>Try: &quot;5 days in Dubai for 2 adults and 1 child, budget ₹1,20,000&quot;</p>
-            </div>
-          )}
-
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{ ...styles.messageWrapper, justifyContent: msg.role === "USER" ? "flex-end" : "flex-start" }}
-            >
-              <div
-                style={{
-                  ...styles.message,
-                  backgroundColor: msg.role === "USER" ? "#2563eb" : "#e5e7eb",
-                  color: msg.role === "USER" ? "white" : "#1f2937",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {msg.content}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+            {historyError && (
+              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {historyError}
+              </p>
+            )}
+            {messages.length === 0 && (
+              <div className="mk-fade flex flex-col items-center gap-3 pt-10 text-center">
+                <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-100 text-brand-700"><Sparkles size={26} /></span>
+                <h3 className="font-serif text-3xl text-gray-900">Where would you like to send your client?</h3>
+                <p className="max-w-md text-sm text-gray-500">
+                  Tell me the place, travel date and number of persons. I&apos;ll check live availability, build the itinerary with rates, and prepare a quotation.
+                </p>
+                <div className="mt-4 grid w-full gap-2 sm:grid-cols-2">
+                  {SUGGESTIONS.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => send(q)}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 shadow-sm transition hover:border-brand-300 hover:bg-brand-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )}
 
-          {loading && progress && (
-            <p role="status" style={styles.progress}>
-              {progress}…
-            </p>
-          )}
+            {messages.map((msg) =>
+              msg.role === "USER" ? (
+                <div key={msg.id} className="mk-fade flex justify-end">
+                  <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-700 px-4 py-2.5 text-sm leading-relaxed text-white">
+                    {msg.content}
+                  </div>
+                </div>
+              ) : (
+                <div key={msg.id} className="mk-fade flex items-start gap-3">
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-700"><Bot size={16} /></span>
+                  <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-md border border-gray-200 bg-white px-4 py-2.5 text-sm leading-relaxed text-gray-800 shadow-sm">
+                    {msg.content}
+                  </div>
+                </div>
+              )
+            )}
 
-          {itinerary && conversationId && (
-            <p style={{ margin: "8px 0" }}>
-              <Link href={`/designer/${conversationId}`} style={{ color: "#2563eb", textDecoration: "underline" }}>
-                Open in the itinerary designer (edit, reorder, map)
-              </Link>
-            </p>
-          )}
-          {itinerary && <ItineraryCards itinerary={itinerary} />}
+            {loading && (
+              <div role="status" className="flex items-center gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-700"><Bot size={16} /></span>
+                <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-500 shadow-sm">
+                  <span className="mk-typing" aria-hidden="true"><span /><span /><span /></span>
+                  {progress ? `${progress}…` : "Thinking…"}
+                </div>
+              </div>
+            )}
 
-          {sendError && (
-            <p role="alert" style={styles.error}>
-              {sendError}
-            </p>
-          )}
-          {activityQuery && <ViatorActivitySearch key={activityQuery} query={activityQuery} />}
-          <div ref={messagesEndRef} />
+            {itinerary && conversationId && (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/designer/${conversationId}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-100"
+                >
+                  <MapIcon size={15} /> Open in the itinerary designer (edit, reorder, map)
+                </Link>
+                <Link
+                  href={`/designer/${conversationId}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <FileText size={15} /> Quotation
+                </Link>
+              </div>
+            )}
+            {itinerary && <ItineraryCards itinerary={itinerary} />}
+
+            {sendError && (
+              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {sendError}
+              </p>
+            )}
+            {activityQuery && <ViatorActivitySearch key={activityQuery} query={activityQuery} />}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
-        <form onSubmit={sendMessage} style={styles.form}>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about destinations, activities, prices…"
-            maxLength={4000}
-            disabled={loading}
-            style={styles.input}
-            aria-label="Message"
-          />
-          {loading ? (
-            <button type="button" onClick={stop} style={{ ...styles.button, backgroundColor: "#6b7280" }}>
-              Stop
-            </button>
-          ) : (
-            <button type="submit" disabled={!input.trim()} style={{ ...styles.button, opacity: input.trim() ? 1 : 0.5 }}>
-              Send
-            </button>
-          )}
+        <form onSubmit={sendMessage} className="border-t border-gray-200 bg-white px-4 py-3">
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl border border-gray-300 bg-white py-1.5 pl-4 pr-1.5 shadow-sm focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/15">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="e.g. Dubai, 12 Dec, 2 adults 1 child"
+              maxLength={4000}
+              disabled={loading}
+              className="min-w-0 flex-1 border-0 bg-transparent py-2 text-sm shadow-none outline-none focus:shadow-none focus:ring-0"
+              aria-label="Message"
+            />
+            {loading ? (
+              <button type="button" onClick={stop} aria-label="Stop" className="grid h-9 w-9 place-items-center rounded-xl bg-gray-600 text-white hover:bg-gray-700">
+                <Square size={14} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                aria-label="Send"
+                className="grid h-9 w-9 place-items-center rounded-xl bg-brand-700 text-white transition hover:bg-brand-800 disabled:opacity-40"
+              >
+                <ArrowUp size={18} />
+              </button>
+            )}
+          </div>
         </form>
-      </div>
+      </section>
     </div>
   );
 }
 
 function ItineraryCards({ itinerary }: { itinerary: Itinerary }) {
   return (
-    <section aria-label="Itinerary" style={styles.itinerary}>
-      <h3 style={{ margin: "0 0 8px" }}>{itinerary.title}</h3>
-      <p style={styles.legend}>
+    <section aria-label="Itinerary" className="mk-card mk-fade p-5">
+      <h3 className="font-serif text-2xl text-gray-900">{itinerary.title}</h3>
+      <p className="mb-4 mt-1 text-xs text-gray-500">
         Items are marked LIVE only when confirmed by a supplier availability check. Nothing here is booked.
       </p>
-      {itinerary.days.map((day) => (
-        <div key={day.dayNumber} style={styles.dayCard}>
-          <strong>
-            Day {day.dayNumber}
-            {day.date ? ` · ${day.date}` : ""} — {day.title}
-          </strong>
-          <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-            {day.items.map((item) => {
-              const badge = STATUS_STYLE[item.status] ?? STATUS_STYLE.UNVERIFIED;
-              return (
-                <li key={item.id} style={{ marginBottom: 4 }}>
-                  {item.startTime ? `${item.startTime} ` : ""}
-                  {item.title}
-                  {item.price !== undefined && item.currency ? ` · ${item.currency} ${item.price}` : ""}{" "}
-                  <span style={{ ...styles.badge, backgroundColor: badge.bg, color: badge.fg }}>{item.status}</span>
-                </li>
-              );
-            })}
-            {day.items.length === 0 && <li style={{ listStyle: "none", color: "#6b7280" }}>Nothing planned yet</li>}
-          </ul>
-        </div>
-      ))}
+      <div className="space-y-4">
+        {itinerary.days.map((day) => (
+          <div key={day.dayNumber} className="flex gap-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-xs font-bold text-brand-800">
+              D{day.dayNumber}
+            </div>
+            <div className="min-w-0 flex-1 border-b border-gray-100 pb-4 last:border-0">
+              <p className="text-sm font-semibold text-gray-900">
+                {day.title}
+                {day.date ? <span className="ml-2 font-normal text-gray-400">{day.date}</span> : null}
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {day.items.map((item) => (
+                  <li key={item.id} className="flex flex-wrap items-center gap-x-2 text-sm text-gray-700">
+                    {item.startTime && <span className="text-gray-400">{item.startTime}</span>}
+                    <span>{item.title}</span>
+                    {item.price !== undefined && item.currency ? (
+                      <span className="font-medium text-gray-900">
+                        {item.currency} {item.price}
+                      </span>
+                    ) : null}
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[item.status] ?? STATUS_CLASS.UNVERIFIED}`}>
+                      {item.status}
+                    </span>
+                  </li>
+                ))}
+                {day.items.length === 0 && <li className="text-sm text-gray-400">Nothing planned yet</li>}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
-
-const styles: { [key: string]: React.CSSProperties } = {
-  shell: { display: "flex", height: "100vh", backgroundColor: "#f9fafb" },
-  sidebar: {
-    width: 240,
-    borderRight: "1px solid #e5e7eb",
-    backgroundColor: "white",
-    display: "flex",
-    flexDirection: "column",
-    padding: 12,
-    gap: 8,
-  },
-  newChat: {
-    padding: "10px 12px",
-    border: "1px solid #2563eb",
-    color: "#2563eb",
-    backgroundColor: "white",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  sidebarList: { display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" },
-  sidebarItem: {
-    textAlign: "left",
-    padding: "8px 10px",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 13,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  sidebarEmpty: { color: "#6b7280", fontSize: 13, margin: "8px 4px" },
-  container: {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    backgroundColor: "#f9fafb",
-    overflow: "hidden",
-  },
-  header: { backgroundColor: "#2563eb", color: "white", padding: "16px 20px", textAlign: "center" },
-  notice: { margin: 0, padding: "8px 16px", backgroundColor: "#fef9c3", color: "#854d0e", fontSize: 13 },
-  messagesArea: { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "12px" },
-  welcomeMessage: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "8px",
-    color: "#6b7280",
-    fontSize: "16px",
-    textAlign: "center",
-    marginTop: "60px",
-  },
-  messageWrapper: { display: "flex", gap: "12px" },
-  message: { maxWidth: "70%", padding: "12px 16px", borderRadius: "12px", wordWrap: "break-word", fontSize: 14, lineHeight: 1.5 },
-  progress: { margin: 0, color: "#6b7280", fontSize: 13, fontStyle: "italic" },
-  itinerary: { backgroundColor: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 },
-  legend: { margin: "0 0 12px", color: "#6b7280", fontSize: 12 },
-  dayCard: { borderTop: "1px solid #f3f4f6", padding: "10px 0", fontSize: 14 },
-  badge: { fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999, verticalAlign: "middle" },
-  form: { display: "flex", gap: "8px", padding: "16px", borderTop: "1px solid #e5e7eb", backgroundColor: "white" },
-  input: { flex: 1, padding: "12px 16px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "inherit" },
-  button: { padding: "12px 24px", backgroundColor: "#2563eb", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 },
-  error: { margin: 0, padding: "10px 12px", borderRadius: 8, backgroundColor: "#fff1ee", color: "#984c3c", fontSize: 13 },
-};

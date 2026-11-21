@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthShell } from "@/components/auth-shell";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,48 +45,42 @@ export default function RegisterPage() {
     router.refresh();
   }
 
+  const field = "w-full rounded-lg border px-3.5 py-2.5 text-sm";
+  const label = "flex flex-col gap-1.5 text-sm font-medium text-gray-700";
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      <h1 className="text-2xl font-semibold">Create your agency account</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
+    <AuthShell title="Create your agency account" subtitle="Start your free trial. No card needed.">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <label className={label}>
           Your name
-          <input name="name" required autoComplete="name" className="rounded border px-3 py-2" />
+          <input name="name" required autoComplete="name" className={field} />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={label}>
           Agency name
-          <input name="agencyName" required minLength={2} className="rounded border px-3 py-2" />
+          <input name="agencyName" required minLength={2} className={field} />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={label}>
           Email
-          <input name="email" type="email" required autoComplete="email" className="rounded border px-3 py-2" />
+          <input name="email" type="email" required autoComplete="email" className={field} />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={label}>
           Password (min 10 characters)
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={10}
-            autoComplete="new-password"
-            className="rounded border px-3 py-2"
-          />
+          <input name="password" type="password" required minLength={10} autoComplete="new-password" className={field} />
         </label>
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
-        <button disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-60">
+        <button disabled={loading} className="rounded-lg bg-brand-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 disabled:opacity-60">
           {loading ? "Creating…" : "Create account"}
         </button>
       </form>
-      <p className="text-sm">
+      <p className="mt-6 text-sm text-gray-500">
         Already registered?{" "}
-        <Link href="/login" className="text-blue-600 underline">
+        <Link href="/login" className="font-medium text-brand-700 hover:underline">
           Sign in
         </Link>
       </p>
-    </main>
+    </AuthShell>
   );
 }
