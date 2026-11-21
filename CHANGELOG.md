@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Phase 5 basics: itinerary designer
+- `/designer` (trip list, create a trip without the AI) and `/designer/[id]` (edit days and items: add, edit, remove, move up/down/to another day, rename day, add/remove day, optimise order). Edits the same `Conversation.state.itinerary` the AI uses.
+- Map (Leaflet + OpenStreetMap tiles, no key) of one day's located items.
+- `src/server/travel/geo.ts`: haversine distance, straight-line travel estimates (always labelled estimate), nearest-neighbour ordering, per-day route totals.
+- Itinerary patches `move_item` and `optimize_day`; optional `lat`/`lng` on items.
+- API: `GET/POST /api/itineraries`, `GET/PATCH /api/itineraries/[id]` (atomic multi-patch, tenant and owner scoped, rate limited). Chat links to the designer.
+- 8 new tests (84 total). Verified in a real browser and against Neon, including cross-tenant denial.
+
 ### Phase 4: supplier framework
 - `SupplierAdapter` interface and normalised `InventoryItem` (integer minor units, `LIVE`/`SANDBOX` status, `checkedAt`).
 - Parallel search engine: per-supplier timeout, one failing supplier never affects others, upstream errors hidden from users, 60s in-memory cache, ranking (relevance/price/rating), budget filter that ignores items in other currencies.

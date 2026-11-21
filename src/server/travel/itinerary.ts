@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { hasCoords, nearestNeighbourOrder } from "./geo";
 
 /**
  * Itinerary model held in the conversation state. Patches touch only the days /
@@ -39,6 +40,9 @@ export const itemInputSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   location: z.string().max(200).optional(),
+  /** Optional coordinates; only set when known. Used for route estimates and the map. */
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
   supplier: z.string().max(60).optional(),
   productCode: z.string().max(100).optional(),
   price: z.number().min(0).optional(),
@@ -113,6 +117,15 @@ export const patchSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_day_title"), day: z.number().int().min(1), title: z.string().min(1).max(200) }),
   z.object({ op: z.literal("add_day"), title: z.string().min(1).max(200) }),
   z.object({ op: z.literal("remove_day"), day: z.number().int().min(1) }),
+  /** Move an item to another position or day. position is 0-based; omitted means the end. */
+  z.object({
+    op: z.literal("move_item"),
+    itemId: z.string().min(1),
+    toDay: z.number().int().min(1),
+    position: z.number().int().min(0).optional(),
+  }),
+  /** Re-order the located items of one day by nearest neighbour; unlocated items keep their slots. */
+  z.object({ op: z.literal("optimize_day"), day: z.number().int().min(1) }),
 ]);
 
 export type ItineraryPatch = z.infer<typeof patchSchema>;
@@ -168,6 +181,31 @@ export function applyPatch(it: Itinerary, patch: ItineraryPatch): Itinerary {
     }
     case "add_day":
       return renumber({ ...it, days: [...it.days, { dayNumber: it.days.length + 1, title: patch.title, items: [] }] });
+    case "move_item": {
+      const { day, idx } = findItem(it, patch.itemId);
+      const target = it.days.find((d) => d.dayNumber === patch.toDay);
+      if (!target) throw new ItineraryError(`Day ${patch.toDay} not found`);
+      const moving = day.items[idx];
+      const without = it.days.map((d) => (d === day ? { ...d, items: d.items.filter((x) => x.id !== moving.id) } : d));
+      return {
+        ...it,
+        days: without.map((d) => {
+          if (d.dayNumber !== patch.toDay) return d;
+          const pos = Math.min(patch.position ?? d.items.length, d.items.length);
+          return { ...d, items: [...d.items.slice(0, pos), moving, ...d.items.slice(pos)] };
+        }),
+      };
+    }
+    case "optimize_day": {
+      const day = it.days.find((d) => d.dayNumber === patch.day);
+      if (!day) throw new ItineraryError(`Day ${patch.day} not found`);
+      const located = day.items.filter(hasCoords);
+      if (located.length < 3) return it; // nothing to optimise
+      const ordered = nearestNeighbourOrder(located.map((value) => ({ value, at: { lat: value.lat, lng: value.lng } })));
+      let next = 0;
+      const items = day.items.map((x) => (hasCoords(x) ? ordered[next++].value : x));
+      return { ...it, days: it.days.map((d) => (d === day ? { ...d, items } : d)) };
+    }
     case "remove_day": {
       if (it.days.length === 1) throw new ItineraryError("Cannot remove the only day");
       if (!it.days.some((d) => d.dayNumber === patch.day)) throw new ItineraryError(`Day ${patch.day} not found`);

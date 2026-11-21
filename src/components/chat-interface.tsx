@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ViatorActivitySearch } from "@/components/viator-activity-search";
 import type { Itinerary } from "@/server/travel/itinerary";
@@ -255,6 +256,13 @@ export function ChatInterface() {
             </p>
           )}
 
+          {itinerary && conversationId && (
+            <p style={{ margin: "8px 0" }}>
+              <Link href={`/designer/${conversationId}`} style={{ color: "#2563eb", textDecoration: "underline" }}>
+                Open in the itinerary designer (edit, reorder, map)
+              </Link>
+            </p>
+          )}
           {itinerary && <ItineraryCards itinerary={itinerary} />}
 
           {sendError && (
