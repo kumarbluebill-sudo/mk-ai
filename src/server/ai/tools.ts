@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { searchInventory } from "@/server/suppliers/search";
 import { getViatorClient } from "@/integrations/viator/client";
 import { searchDestinations } from "@/lib/destinations";
 import { can, type Action, type TenantRoleName } from "@/server/permissions";
@@ -161,18 +162,42 @@ export const TOOLS: ToolDefinition[] = [
       keyword: z.string().min(2).max(200),
       startDate: dateSchema.optional(),
       currency: z.enum(["USD", "EUR", "GBP", "AUD", "CAD"]).default("USD"),
+      sort: z.enum(["relevance", "price", "rating"]).default("relevance"),
+      maxPricePerPerson: z.number().positive().optional(),
     }),
     execute: async (input) => {
-      const r = await viatorCall((c) => c.searchActivities(input));
-      if (!r.ok) return r;
+      // All configured activity suppliers are queried in parallel; each supplier's status is reported.
+      const result = await searchInventory(
+        { category: "activity", keyword: input.keyword, startDate: input.startDate, currency: input.currency, limit: 10 },
+        {
+          sort: input.sort,
+          maxPriceMinor: input.maxPricePerPerson ? Math.round(input.maxPricePerPerson * 100) : undefined,
+        }
+      );
+      const anyConfigured = result.suppliers.some((s) => s.status !== "NOT_CONFIGURED" && s.status !== "UNSUPPORTED");
+      if (!anyConfigured) {
+        return { ok: false, error: "SUPPLIER_NOT_CONFIGURED", suppliers: result.suppliers };
+      }
+      if (result.suppliers.every((s) => s.status !== "OK")) {
+        return { ok: false, error: "SUPPLIER_ERROR", suppliers: result.suppliers };
+      }
       return {
-        source: "VIATOR",
-        environment: r.environment,
-        // Sandbox data is test data, not sellable live inventory.
-        liveInventory: r.environment === "production",
-        checkedAt: new Date().toISOString(),
-        totalCount: r.data.totalCount,
-        activities: r.data.activities.slice(0, 10),
+        checkedAt: result.checkedAt,
+        // True only when items came from a production supplier API; sandbox items are labelled SANDBOX.
+        liveInventory: result.liveInventory,
+        suppliers: result.suppliers,
+        activities: result.items.map((i) => ({
+          supplier: i.supplier,
+          id: i.supplierItemId,
+          title: i.title,
+          description: i.description.slice(0, 300),
+          pricePerPerson: i.price && i.price.basis === "FROM_PER_PERSON" ? i.price.amountMinor / 100 : null,
+          currency: i.price?.currency ?? null,
+          duration: i.duration ?? null,
+          rating: i.rating ?? null,
+          reviews: i.reviewCount ?? null,
+          dataStatus: i.dataStatus,
+        })),
       };
     },
   }),

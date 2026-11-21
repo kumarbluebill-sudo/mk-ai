@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Phase 4: supplier framework
+- `SupplierAdapter` interface and normalised `InventoryItem` (integer minor units, `LIVE`/`SANDBOX` status, `checkedAt`).
+- Parallel search engine: per-supplier timeout, one failing supplier never affects others, upstream errors hidden from users, 60s in-memory cache, ranking (relevance/price/rating), budget filter that ignores items in other currencies.
+- Viator wrapped as the first adapter; Yatra and Klook are declared as `NOT_CONFIGURED` (no endpoints guessed, see API_INTEGRATION_GUIDE).
+- `search_activities` AI tool now uses the engine and reports each supplier's status.
+- New routes `GET /api/suppliers/search`, `GET /api/suppliers/status`. 15 new tests (76 total).
+
 ### Neon
 - Database moved to Neon Postgres (`neon.ts`, `neon env pull` writes `DATABASE_URL` pooled and `DATABASE_URL_UNPOOLED` direct). App uses the pooled URL through the existing Prisma + `pg` driver; `prisma.config.ts` uses the direct URL for migrations and now loads `.env.local`.
 - Both migrations applied to a fresh Neon database; register, login, chat persistence and cross-tenant denial verified over HTTP.

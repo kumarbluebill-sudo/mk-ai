@@ -11,3 +11,5 @@ dist/
 
 .vercel
 .neon
+
+.env*

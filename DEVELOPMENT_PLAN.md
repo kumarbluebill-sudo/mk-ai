@@ -5,7 +5,7 @@
 | 1 | Codebase audit, docs, build fix | Done |
 | 2 | Foundation: tenancy schema, Auth.js, tenant isolation, encryption, Docker, CI, tests | Done, except Redis client and DB-backed tests |
 | 3 | AI engine: provider adapters (Anthropic/OpenAI), tool registry, agent loop, step-level streaming chat | Done for 9 of 20 tools; the rest return NOT_CONFIGURED. Token-level streaming not done |
-| 4 | Supplier adapter framework, parallel live search, availability verification | Next cycle |
+| 4 | Supplier adapter framework, parallel live search, availability verification | **Framework and parallel search done** (Viator only). Availability verification across suppliers and a second real supplier need official docs/credentials |
 | 5 | Day-wise itinerary designer, icons, drag-and-drop, maps/routing | Next cycle |
 | 6 | Pricing/markup/GST engine, branded PDFs | Next cycle |
 | 7 | Booking, Razorpay payments, webhooks, vouchers | Next cycle |
