@@ -8,10 +8,11 @@ Multi-tenant AI travel planning SaaS by MK Solutions. Travel agencies register t
 - Tenant isolation via a scoped Prisma client (`src/server/tenant-scope.ts`).
 - AI chat with provider-independent adapters (Anthropic, OpenAI, optional fallback), tool calling, per-conversation memory, token-usage logging and streamed progress.
 - Viator Partner API v2: live activity search, product details, availability and pricing.
+- Quotations: priced from the itinerary with optional GST split, stored as an immutable snapshot, downloadable as a PDF.
 - Itinerary designer (`/designer`): edit trips manually or after the AI builds them, reorder, optimise stop order, map with straight-line travel estimates.
 - Supplier adapter framework (`src/server/suppliers`): normalised inventory, parallel search with per-supplier timeout, failure isolation, 60s cache, price/rating ranking, budget filter. `GET /api/suppliers/search` and `/api/suppliers/status`.
 - Itinerary editing by targeted patches, pricing with markup/tax in exact minor units, draft quotations.
-- Docker, docker-compose, CI workflow, health check, 84 unit tests.
+- Docker, docker-compose, CI workflow, health check, 98 unit tests.
 
 ## What does NOT exist yet
 

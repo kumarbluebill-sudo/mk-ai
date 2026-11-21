@@ -40,3 +40,57 @@ describe("calculatePackagePrice", () => {
     expect(() => calculatePackagePrice({ lines: [line("A", 100)], discount: 500 })).toThrow(PricingError);
   });
 });
+
+describe("GST split", () => {
+  const lines = [{ name: "Package", unitCost: 1000, quantity: 1, currency: "INR" }];
+
+  it("splits intra-state GST into CGST and SGST halves", () => {
+    const p = calculatePackagePrice({ lines, gst: { ratePercent: 18, supply: "INTRA_STATE" } });
+    expect(p.taxLines).toEqual([
+      { label: "CGST", ratePercent: 9, amount: 90 },
+      { label: "SGST", ratePercent: 9, amount: 90 },
+    ]);
+    expect(p.taxes).toBe(180);
+    expect(p.total).toBe(1180);
+  });
+
+  it("charges IGST for inter-state supply", () => {
+    const p = calculatePackagePrice({ lines, gst: { ratePercent: 5, supply: "INTER_STATE" } });
+    expect(p.taxLines).toEqual([{ label: "IGST", ratePercent: 5, amount: 50 }]);
+    expect(p.total).toBe(1050);
+  });
+
+  it("never loses or invents a paisa when the tax is an odd number of paise", () => {
+    // 333.33 * 5% = 16.6665 -> 1667 paise; halves 833 + 834 must add back to exactly 1667.
+    const p = calculatePackagePrice({
+      lines: [{ name: "x", unitCost: 333.33, quantity: 1, currency: "INR" }],
+      gst: { ratePercent: 5, supply: "INTRA_STATE" },
+    });
+    expect(p.taxes).toBeCloseTo(p.taxLines[0].amount + p.taxLines[1].amount, 10);
+    expect(Math.round(p.taxes * 100)).toBe(1667);
+    expect(Math.round(p.total * 100)).toBe(33333 + 1667);
+  });
+
+  it("taxes after markup and discount", () => {
+    const p = calculatePackagePrice({
+      lines,
+      markup: { percentage: 10 },
+      discount: 100,
+      gst: { ratePercent: 10, supply: "INTER_STATE" },
+    });
+    expect(p.taxable).toBe(1000);
+    expect(p.taxes).toBe(100);
+    expect(p.total).toBe(1100);
+  });
+
+  it("rejects combining tax modes and out-of-range rates", () => {
+    expect(() => calculatePackagePrice({ lines, taxPercent: 5, gst: { ratePercent: 5, supply: "INTER_STATE" } })).toThrow(PricingError);
+    expect(() => calculatePackagePrice({ lines, gst: { ratePercent: 150, supply: "INTER_STATE" } })).toThrow(PricingError);
+    expect(() => calculatePackagePrice({ lines, gst: { ratePercent: -1, supply: "INTER_STATE" } })).toThrow(PricingError);
+  });
+
+  it("keeps the legacy single tax line", () => {
+    const p = calculatePackagePrice({ lines, taxPercent: 18 });
+    expect(p.taxLines).toEqual([{ label: "Tax", ratePercent: 18, amount: 180 }]);
+  });
+});

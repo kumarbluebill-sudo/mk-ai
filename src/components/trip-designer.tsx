@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import QuotePanel from "./quote-panel";
 import type { DayRoute } from "@/server/travel/geo";
 import type { Itinerary, ItineraryDay, ItineraryItem, ItineraryPatch } from "@/server/travel/itinerary";
 
@@ -315,6 +316,8 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
         className="rounded border px-3 py-1 text-sm disabled:opacity-50">
         + Add day
       </button>
+
+      <QuotePanel conversationId={conversationId} />
     </main>
   );
 }

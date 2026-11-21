@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createQuotation, QuotationError, quoteOptionsSchema, visiblePrice } from "@/server/quotation/service";
 import { searchInventory } from "@/server/suppliers/search";
 import { getViatorClient } from "@/integrations/viator/client";
 import { searchDestinations } from "@/lib/destinations";
@@ -322,114 +323,24 @@ export const TOOLS: ToolDefinition[] = [
   define({
     name: "create_quotation",
     description:
-      "Save the current itinerary and a DRAFT quotation priced from items that have a price. Does not book anything.",
-    schema: z.object({
-      taxPercent: z.number().min(0).max(100).default(0),
-      discount: z.number().min(0).default(0),
-    }),
+      "Save the current itinerary and a DRAFT quotation priced from items that have a price. Does not book anything. For Indian GST pass gst {ratePercent, supply: INTRA_STATE|INTER_STATE}; only use a rate the user gave you.",
+    schema: quoteOptionsSchema,
     requires: "quotation:write",
     execute: async (input, ctx) => {
       const itinerary = ctx.state.itinerary;
       if (!itinerary) return { error: "NO_ITINERARY", message: "Create an itinerary first." };
-
-      const priced = itinerary.days.flatMap((d) =>
-        d.items.filter((i) => i.price !== undefined && i.currency).map((i) => ({ day: d.dayNumber, item: i }))
-      );
-      if (priced.length === 0) return { error: "NOTHING_PRICED", message: "No itinerary item has a price yet." };
-
-      const markupRow = await ctx.db.markupSetting.findFirst({ where: { active: true, supplierId: null } });
-      let price;
       try {
-        price = calculatePackagePrice({
-          lines: priced.map(({ item }) => ({
-            name: item.title,
-            unitCost: item.price as number,
-            quantity: 1,
-            currency: item.currency as string,
-          })),
-          taxPercent: input.taxPercent,
-          discount: input.discount,
-          markup: markupRow
-            ? {
-                percentage: markupRow.percentage ? Number(markupRow.percentage) : undefined,
-                fixedAmount: markupRow.fixedAmount ? Number(markupRow.fixedAmount) : undefined,
-              }
-            : undefined,
-        });
+        const q = await createQuotation(ctx, itinerary, input);
+        ctx.state.quotationId = q.id;
+        return {
+          quotation: { reference: q.reference, validUntil: q.validUntil, ...visiblePrice(ctx, q.price) },
+          status: "DRAFT",
+          warnings: q.warnings,
+        };
       } catch (error) {
-        if (error instanceof PricingError) return { error: "PRICING_ERROR", message: error.message };
+        if (error instanceof QuotationError) return { error: error.code, message: error.message };
         throw error;
       }
-
-      const customer = await ctx.db.customer.findFirst({ where: { userId: ctx.userId } });
-      if (!customer) return { error: "NO_CUSTOMER_PROFILE" };
-
-      const unpriced = itinerary.days.flatMap((d) => d.items.filter((i) => i.price === undefined).map((i) => i.title));
-      const unverified = priced.filter(({ item }) => item.status !== "LIVE").map(({ item }) => item.title);
-      const reference = `QT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
-      const quotation = await ctx.db.$transaction(async (tx) => {
-        const saved = await tx.itinerary.create({
-          data: {
-            tenantId: ctx.tenantId,
-            customerId: customer.id,
-            title: itinerary.title,
-            startDate: itinerary.startDate ? new Date(itinerary.startDate) : undefined,
-            status: "DRAFT",
-            days: {
-              create: itinerary.days.map((d) => ({
-                dayNumber: d.dayNumber,
-                date: d.date ? new Date(d.date) : undefined,
-                title: d.title,
-                items: {
-                  create: d.items.map((i, idx) => ({
-                    title: i.title,
-                    description: i.description,
-                    startTime: i.startTime,
-                    endTime: i.endTime,
-                    location: i.location,
-                    sortOrder: idx,
-                    supplierName: i.supplier,
-                    liveStatus: i.status === "LIVE" ? ("AVAILABLE" as const) : ("DEMO" as const),
-                    price: i.price,
-                    currency: i.currency ?? price.currency,
-                    metadata: { category: i.category, productCode: i.productCode ?? null },
-                  })),
-                },
-              })),
-            },
-          },
-        });
-        return tx.quotation.create({
-          data: {
-            tenantId: ctx.tenantId,
-            customerId: customer.id,
-            itineraryId: saved.id,
-            reference,
-            status: "DRAFT",
-            currency: price.currency,
-            subtotal: price.subtotal,
-            markup: price.markup,
-            taxes: price.taxes,
-            discount: price.discount,
-            total: price.total,
-            validUntil: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          },
-        });
-      });
-
-      ctx.state.quotationId = quotation.id;
-      void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "quotation.created", entity: "Quotation", entityId: quotation.id, metadata: { reference } });
-      const view = { reference, currency: price.currency, taxes: price.taxes, discount: price.discount, total: price.total };
-      return {
-        quotation: can(ctx.role, "cost:view") ? { ...view, subtotal: price.subtotal, markup: price.markup } : view,
-        status: "DRAFT",
-        warnings: {
-          unpricedItems: unpriced,
-          itemsNotVerifiedLive: unverified,
-          note: "Prices are not confirmed until live availability is re-checked. Nothing has been booked.",
-        },
-      };
     },
   }),
 

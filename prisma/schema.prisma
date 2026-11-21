@@ -405,6 +405,8 @@ model Quotation {
   discount Decimal @default(0) @db.Decimal(12, 2)
   total Decimal @default(0) @db.Decimal(12, 2)
   validUntil DateTime?
+  /// Document data exactly as quoted (see src/server/quotation). Never edited after creation.
+  snapshot Json?
   customer Customer @relation(fields: [customerId], references: [id])
   itinerary Itinerary? @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
   items QuotationItem[]

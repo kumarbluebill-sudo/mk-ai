@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Phase 6: pricing, GST and PDF quotations
+- Pricing engine: Indian GST split (CGST+SGST within a state, IGST across states) with exact-paisa halves; rate is always supplied by the user, no statutory rates or TCS are assumed. Breakdown now has `taxable` and `taxLines`.
+- Quotation service shared by the AI tool and the API: creates a DRAFT quotation and stores an immutable `snapshot` (migration `20261121120000_quotation_snapshot`).
+- Customer PDF (pdf-lib): company header and GSTIN, day-wise itinerary, package price (cost and markup never shown separately), discount, tax lines, total, validity, notices. Non-supplier-checked items are marked "indicative"; it never claims a confirmed booking.
+- API: `POST /api/itineraries/[id]/quotation`, `GET /api/quotations`, `GET /api/quotations/[id]/pdf` (tenant and owner scoped, audited). Quotation panel in the designer.
+- Known limits: built-in PDF fonts cannot draw the rupee sign or non-Latin scripts (currency is written as a code, other characters become "?"); no email/WhatsApp delivery; no quotation edit/versioning or status workflow yet.
+- 22 new tests (98 total).
+
 ### Phase 5 basics: itinerary designer
 - `/designer` (trip list, create a trip without the AI) and `/designer/[id]` (edit days and items: add, edit, remove, move up/down/to another day, rename day, add/remove day, optimise order). Edits the same `Conversation.state.itinerary` the AI uses.
 - Map (Leaflet + OpenStreetMap tiles, no key) of one day's located items.

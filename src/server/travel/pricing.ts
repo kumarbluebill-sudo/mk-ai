@@ -23,8 +23,20 @@ export interface PriceInput {
   markup?: MarkupRule;
   /** Tax percentage applied on (subtotal + markup - discount), e.g. GST 18. */
   taxPercent?: number;
+  /**
+   * Indian GST split. Mutually exclusive with taxPercent. The rate is supplied by the caller (your
+   * accountant decides it for the service); nothing here hardcodes statutory rates or TCS.
+   * INTRA_STATE splits it into CGST + SGST halves, INTER_STATE charges IGST.
+   */
+  gst?: { ratePercent: number; supply: "INTRA_STATE" | "INTER_STATE" };
   /** Discount in major units. */
   discount?: number;
+}
+
+export interface TaxLine {
+  label: string;
+  ratePercent: number;
+  amount: number;
 }
 
 export interface PriceBreakdown {
@@ -32,7 +44,10 @@ export interface PriceBreakdown {
   subtotal: number;
   markup: number;
   discount: number;
+  /** Amount tax is charged on: subtotal + markup - discount. */
+  taxable: number;
   taxes: number;
+  taxLines: TaxLine[];
   total: number;
   lines: { name: string; quantity: number; unitCost: number; lineTotal: number }[];
 }
@@ -80,14 +95,34 @@ export function calculatePackagePrice(input: PriceInput): PriceBreakdown {
   const taxable = subtotal + markup - discount;
   const taxPct = input.taxPercent ?? 0;
   if (taxPct < 0) throw new PricingError("Tax cannot be negative");
-  const taxes = Math.round((taxable * taxPct) / 100);
+  if (input.gst && taxPct > 0) throw new PricingError("Use either taxPercent or gst, not both");
+
+  const taxLinesMinor: { label: string; ratePercent: number; minor: number }[] = [];
+  if (input.gst) {
+    const rate = input.gst.ratePercent;
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new PricingError("GST rate must be between 0 and 100");
+    const total = Math.round((taxable * rate) / 100);
+    if (input.gst.supply === "INTER_STATE") {
+      taxLinesMinor.push({ label: "IGST", ratePercent: rate, minor: total });
+    } else {
+      // Halves always add back up to the exact total, so no paisa is lost or invented.
+      const cgst = Math.floor(total / 2);
+      taxLinesMinor.push({ label: "CGST", ratePercent: rate / 2, minor: cgst });
+      taxLinesMinor.push({ label: "SGST", ratePercent: rate / 2, minor: total - cgst });
+    }
+  } else if (taxPct > 0) {
+    taxLinesMinor.push({ label: "Tax", ratePercent: taxPct, minor: Math.round((taxable * taxPct) / 100) });
+  }
+  const taxes = taxLinesMinor.reduce((sum, t) => sum + t.minor, 0);
 
   return {
     currency,
     subtotal: toMajor(subtotal),
     markup: toMajor(markup),
     discount: toMajor(discount),
+    taxable: toMajor(taxable),
     taxes: toMajor(taxes),
+    taxLines: taxLinesMinor.map((t) => ({ label: t.label, ratePercent: t.ratePercent, amount: toMajor(t.minor) })),
     total: toMajor(taxable + taxes),
     lines: lines.map((l) => ({
       name: l.name,
