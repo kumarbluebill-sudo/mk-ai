@@ -5,6 +5,9 @@ import { InstallPrompt, OfflineBanner, PwaRegister } from "@/components/pwa";
 import "./globals.css";
 
 // Self-hosted at build time by next/font: no request to Google when a page loads.
+// Pages are rendered per request so each response can carry its own script nonce (see src/proxy.ts).
+export const dynamic = "force-dynamic";
+
 const sans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm-sans", display: "swap" });
 const serif = DM_Serif_Display({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-dm-serif", display: "swap" });
 
