@@ -32,6 +32,8 @@ export interface CompletionResponse {
   model: string;
   /** Set by completeWithFallback: how long the answering provider took. */
   latencyMs?: number;
+  /** Routing details the provider reported about the request (served model, upstream name). Never keys or prompts. */
+  routing?: Record<string, string>;
 }
 
 /** Provider-independent LLM interface. Adapters must never log prompts or keys. */

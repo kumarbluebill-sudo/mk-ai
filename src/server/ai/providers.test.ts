@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { toAnthropicMessages } from "./anthropic";
 import { toOpenAIMessages } from "./openai";
 import { completeWithFallback, getConfiguredProviders } from "./providers";
+import { AiProviderUnavailableError } from "./errors";
 import { AiNotConfiguredError, type AiProvider, type ChatMessage } from "./types";
 
 const conversation: ChatMessage[] = [
@@ -54,7 +55,7 @@ describe("completeWithFallback", () => {
   it("throws the last error when all providers fail", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const a = { name: "a", model: "m", complete: vi.fn().mockRejectedValue(new Error("one")) } as unknown as AiProvider;
-    await expect(completeWithFallback([a], req)).rejects.toThrow("one");
+    await expect(completeWithFallback([a], req)).rejects.toBeInstanceOf(AiProviderUnavailableError);
   });
 });
 

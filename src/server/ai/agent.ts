@@ -1,4 +1,5 @@
-import { estimateCostMicros } from "./config";
+import { estimateCostMicros, noteProviderSuccess } from "./config";
+import { classifyAiError } from "./errors";
 import { completeWithFallback, type FallbackHooks } from "./providers";
 import { executeTool, getToolSpecs, serializeResult, type ToolContext } from "./tools";
 import type { AiProvider, ChatMessage, CompletionRequest, CompletionResponse } from "./types";
@@ -65,9 +66,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       { system: buildSystemPrompt(), messages, tools, maxTokens: 4096, signal },
       {
         // A provider that failed is counted too (zero tokens), so the admin page can show error rates.
-        onFailure: (failed, _error, latencyMs) => {
+        onFailure: (failed, error, latencyMs) => {
           ctx.db.aiUsage
-            .create({ data: { tenantId: ctx.tenantId, userId: ctx.userId, provider: failed.name, model: failed.model, inputTokens: 0, outputTokens: 0, latencyMs, ok: false } })
+            .create({ data: { tenantId: ctx.tenantId, userId: ctx.userId, provider: failed.name, model: failed.model, requestedModel: failed.model, inputTokens: 0, outputTokens: 0, latencyMs, ok: false, errorCategory: classifyAiError(error) } })
             .catch(() => undefined);
         },
       }
@@ -85,10 +86,15 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           outputTokens: response.usage.outputTokens,
           latencyMs: response.latencyMs,
           ok: true,
+          // "model" is the one that answered; a gateway asked for "auto" reports the real one.
+          requestedModel: providers.find((p) => p.name === response.provider)?.model ?? response.model,
+          ...(response.routing ? { routing: response.routing } : {}),
           costMicros: estimateCostMicros(providers.find((p) => p.name === response.provider)?.pricing, response.usage.inputTokens, response.usage.outputTokens),
         },
       })
       .catch((error: unknown) => console.error("AI usage log failed:", error instanceof Error ? error.message : error));
+
+    noteProviderSuccess(response.provider);
 
     if (response.toolCalls.length === 0) {
       return { text: response.text.trim(), stepsUsed: step, hitStepLimit: false };

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runAgent, type AgentEvent } from "@/server/ai/agent";
 import { generateFallbackResponse } from "@/server/ai/fallback";
+import { AiProviderUnavailableError, unavailableMessage } from "@/server/ai/errors";
 import { resolveAiProviders } from "@/server/ai/providers";
 import { emptyState, type ConversationState } from "@/server/ai/tools";
 import type { ChatMessage } from "@/server/ai/types";
@@ -151,8 +152,14 @@ export async function POST(request: NextRequest) {
         send({ type: "message", content: reply, mode, itinerary: state.itinerary ?? null });
       } catch (error) {
         if (!request.signal.aborted) {
-          console.error("Chat error:", error);
-          send({ type: "error", message: "Something went wrong while planning. Please try again." });
+          if (error instanceof AiProviderUnavailableError) {
+            // Categories and provider names only: the failure text itself can carry request details.
+            console.error(`Chat: AI unavailable (${error.category}) after trying ${error.providers.join(", ")}`);
+            send({ type: "error", message: unavailableMessage(error) });
+          } else {
+            console.error("Chat error:", error);
+            send({ type: "error", message: "Something went wrong while planning. Please try again." });
+          }
         }
       } finally {
         send({ type: "done" });

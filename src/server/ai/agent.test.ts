@@ -85,6 +85,29 @@ describe("runAgent", () => {
     });
   });
 
+  it("records the requested and the serving model, and any routing details the gateway reported", async () => {
+    const ctx = makeCtx();
+    const gateway = { name: "freellmapi", model: "auto" } as AiProvider;
+    const { complete } = scripted([{ text: "ok", provider: "freellmapi", model: "real-model-7b", routing: { "x-freellm-provider": "upstream-one" } }]);
+    await runAgent({ providers: [gateway], ctx, history: [], userMessage: "x", complete });
+    expect(ctx.db.aiUsage.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ provider: "freellmapi", model: "real-model-7b", requestedModel: "auto", ok: true, routing: { "x-freellm-provider": "upstream-one" } }),
+    });
+  });
+
+  it("counts a failed provider with its error category and no message text", async () => {
+    const ctx = makeCtx();
+    const failing = { name: "freellmapi", model: "auto" } as AiProvider;
+    const complete = vi.fn(async (_p: AiProvider[], _r: CompletionRequest, hooks?: { onFailure?: (p: AiProvider, e: unknown, ms: number) => void }): Promise<CompletionResponse> => {
+      hooks?.onFailure?.(failing, Object.assign(new Error("customer asked about Dubai"), { status: 429 }), 120);
+      return { text: "ok", toolCalls: [], ...base };
+    });
+    await runAgent({ providers: [failing, provider], ctx, history: [], userMessage: "x", complete });
+    const failed = (ctx.db.aiUsage.create as ReturnType<typeof vi.fn>).mock.calls.map((c) => (c[0] as { data: Record<string, unknown> }).data).find((d) => d.ok === false);
+    expect(failed).toMatchObject({ provider: "freellmapi", requestedModel: "auto", errorCategory: "RATE_LIMIT", inputTokens: 0, outputTokens: 0, latencyMs: 120 });
+    expect(JSON.stringify(failed)).not.toContain("Dubai");
+  });
+
   it("does not fail the chat if usage logging fails", async () => {
     const ctx = makeCtx({
       db: { aiUsage: { create: vi.fn().mockRejectedValue(new Error("db down")) } } as unknown as ToolContext["db"],

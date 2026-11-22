@@ -187,21 +187,27 @@ model Conversation {
 }
 
 model AiUsage {
-  id           String   @id @default(cuid())
-  tenantId     String
-  userId       String?
-  provider     String
-  model        String
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
+  id             String   @id @default(cuid())
+  tenantId       String
+  userId         String?
+  provider       String
+  model          String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
   /// Time the provider took to answer, and whether it answered (failed attempts are recorded with zero tokens).
-  latencyMs    Int?
-  ok           Boolean  @default(true)
+  latencyMs      Int?
+  ok             Boolean  @default(true)
   /// Estimated cost in millionths of the price currency, from the prices the admin entered for the provider at that time.
-  costMicros   Int?
-  createdAt    DateTime @default(now())
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  costMicros     Int?
+  /// The model the request asked for ("auto" for a gateway), while `model` is the one that answered.
+  requestedModel String?
+  /// AUTH, RATE_LIMIT, TIMEOUT, UNAVAILABLE, INVALID_MODEL, BAD_RESPONSE or OTHER, for failed attempts.
+  errorCategory  String?
+  /// Routing details a gateway reported (short strings only; never keys or prompts).
+  routing        Json?
+  createdAt      DateTime @default(now())
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([provider, createdAt])
@@ -693,6 +699,9 @@ model AiProviderConfig {
   lastCheckOk      Boolean?
   lastCheckMessage String?
   lastLatencyMs    Int?
+  lastSuccessAt    DateTime?
+  /// When false this provider is never used as a fallback for another one (it can still be the primary).
+  useAsFallback    Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }

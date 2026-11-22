@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       actorId: admin.userId,
       action: "admin.ai_provider_saved",
       entityId: provider.provider,
-      metadata: { provider: provider.provider, model: provider.model, enabled: provider.enabled, priority: provider.priority, keyChanged: Boolean(parsed.data.apiKey) },
+      metadata: { provider: provider.provider, model: provider.model, enabled: provider.enabled, useAsFallback: provider.useAsFallback, priority: provider.priority, keyChanged: Boolean(parsed.data.apiKey) },
     });
     return NextResponse.json({ success: true, provider });
   } catch (error) {

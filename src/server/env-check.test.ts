@@ -82,3 +82,24 @@ describe("checkEnvironment", () => {
     expect(text).not.toContain("very-secret-key-value");
   });
 });
+
+describe("FreeLLMAPI settings", () => {
+  it("errors when it is the chosen provider but has no key, and never prints values", () => {
+    const issues = checkEnvironment({ ...good, AI_PROVIDER: "freellmapi" });
+    expect(issues.find((i) => i.name === "FREELLMAPI_API_KEY")?.level).toBe("error");
+    expect(checkEnvironment({ ...good, AI_PROVIDER: "freellmapi", FREELLMAPI_API_KEY: "flm_key_value" }).some((i) => i.name === "FREELLMAPI_API_KEY")).toBe(false);
+    expect(JSON.stringify(checkEnvironment({ ...good, AI_FALLBACK_PROVIDER: "freellmapi", FREELLMAPI_API_KEY: "flm_key_value" }))).not.toContain("flm_key_value");
+  });
+
+  it("rejects an invalid base URL and warns that localhost cannot work on Vercel", () => {
+    expect(checkEnvironment({ ...good, FREELLMAPI_BASE_URL: "not a url" }).find((i) => i.name === "FREELLMAPI_BASE_URL")?.level).toBe("error");
+    expect(checkEnvironment({ ...good, FREELLMAPI_BASE_URL: "ftp://x" }).find((i) => i.name === "FREELLMAPI_BASE_URL")?.level).toBe("error");
+    expect(checkEnvironment({ ...good, FREELLMAPI_BASE_URL: "http://localhost:3001/v1" }).find((i) => i.name === "FREELLMAPI_BASE_URL")?.level).toBe("warning");
+    expect(checkEnvironment({ ...good, FREELLMAPI_BASE_URL: "https://gateway.example.com/v1" }).some((i) => i.name === "FREELLMAPI_BASE_URL")).toBe(false);
+  });
+
+  it("catches a key pasted with quotes and a model name with spaces", () => {
+    expect(checkEnvironment({ ...good, FREELLMAPI_API_KEY: '"flm_key"' }).find((i) => i.name === "FREELLMAPI_API_KEY")?.level).toBe("error");
+    expect(checkEnvironment({ ...good, FREELLMAPI_MODEL: "Free LLM Auto" }).find((i) => i.name === "FREELLMAPI_MODEL")?.level).toBe("error");
+  });
+});

@@ -29,6 +29,8 @@ interface Row {
   inputPricePerM: number | null;
   outputPricePerM: number | null;
   lastCheckAt: Date | null;
+  lastSuccessAt: Date | null;
+  useAsFallback: boolean;
   lastCheckOk: boolean | null;
   lastCheckMessage: string | null;
   lastLatencyMs: number | null;
@@ -57,7 +59,7 @@ function fakeDb(usage: unknown[] = []) {
         return { count: before - rows.length };
       },
     },
-    aiUsage: { groupBy: async () => usage },
+    aiUsage: { groupBy: async (args: { by: string[] }) => (args.by.includes("errorCategory") ? [{ provider: "groq", errorCategory: "TIMEOUT", _count: { _all: 2 } }] : usage) },
   };
   return { db: db as unknown as Pick<PrismaClient, "aiProviderConfig" | "aiUsage">, rows };
 }
@@ -122,7 +124,7 @@ describe("saving providers", () => {
   it("lists every known provider, configured or not", async () => {
     const { db } = fakeDb();
     const all = await listProviders(db);
-    expect(all.map((p) => p.provider)).toEqual(["anthropic", "openai", "gemini", "mistral", "deepseek", "groq", "openrouter", "ollama"]);
+    expect(all.map((p) => p.provider)).toEqual(["anthropic", "openai", "gemini", "mistral", "deepseek", "groq", "openrouter", "ollama", "freellmapi"]);
     expect(all.every((p) => p.enabled === false && !p.hasKey)).toBe(true);
   });
 });
@@ -173,13 +175,17 @@ describe("provider requests", () => {
   });
 });
 
+const modelsOk = vi.fn(async () => new Response(JSON.stringify({ object: "list", data: [{ id: "llama-3.3-70b-versatile" }, { id: "other" }] }), { status: 200 })) as unknown as typeof fetch;
+
 describe("testing a provider", () => {
   it("records a working provider with its latency", async () => {
     const { db, rows } = fakeDb();
     await saveProvider(save(), db);
     const fake = { name: "groq", model: "m", complete: vi.fn().mockResolvedValue({ text: "OK", toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, provider: "groq", model: "m" }) } as unknown as AiProvider;
-    const h = await testProvider("groq", db, () => fake);
+    const h = await testProvider("groq", db, () => fake, modelsOk);
     expect(h.ok).toBe(true);
+    expect(h.message).toContain("Connection successful");
+    expect(rows[0].lastSuccessAt).toBeInstanceOf(Date);
     expect(rows[0].lastCheckOk).toBe(true);
     expect(rows[0].lastLatencyMs).not.toBeNull();
   });
@@ -187,11 +193,12 @@ describe("testing a provider", () => {
   it("records a failure with the key scrubbed out of the message", async () => {
     const { db, rows } = fakeDb();
     await saveProvider(save(), db);
-    const fake = { name: "groq", model: "m", complete: vi.fn().mockRejectedValue(new Error("401 invalid key gsk_secretsecretsecret1234 for Bearer abcdefghijkl")) } as unknown as AiProvider;
-    const h = await testProvider("groq", db, () => fake);
+    const fake = { name: "groq", model: "m", complete: vi.fn().mockRejectedValue(Object.assign(new Error("401 invalid key gsk_secretsecretsecret1234 for Bearer abcdefghijkl"), { status: 401 })) } as unknown as AiProvider;
+    const h = await testProvider("groq", db, () => fake, modelsOk);
     expect(h.ok).toBe(false);
-    expect(rows[0].lastCheckMessage).not.toContain("secretsecret");
-    expect(rows[0].lastCheckMessage).toContain("[key]");
+    expect(h.category).toBe("AUTH");
+    // The message is built from the category and status only, so no part of the provider's text (or the key) can reach it.
+    expect(rows[0].lastCheckMessage).not.toMatch(/secretsecret|abcdefghijkl/);
   });
 
   it("explains a key that cannot be decrypted instead of crashing", async () => {
@@ -216,14 +223,31 @@ describe("testing a provider", () => {
 describe("resolving providers for chat", () => {
   const env = (name: string): AiProvider => ({ name, model: "env-model", complete: vi.fn() }) as unknown as AiProvider;
 
-  it("puts enabled saved providers first by priority, skips disabled ones, and appends environment providers once", async () => {
+  it("puts enabled saved providers first by priority and skips disabled ones; environment providers are not mixed in", async () => {
     const { db } = fakeDb();
     await saveProvider(save({ provider: "groq", priority: 20 }), db);
     await saveProvider(save({ provider: "mistral", model: "ml", priority: 10 }), db);
     await saveProvider(save({ provider: "deepseek", model: "dc", priority: 5, enabled: false }), db);
     const list = await resolveProviders(() => [env("groq"), env("openai")], {} as NodeJS.ProcessEnv, db);
-    expect(list.map((p) => p.name)).toEqual(["mistral", "groq", "openai"]);
-    expect(list.find((p) => p.name === "groq")?.model).toBe("llama-3.3-70b-versatile"); // the saved one wins over the env one
+    expect(list.map((p) => p.name)).toEqual(["mistral", "groq"]);
+    expect(list.find((p) => p.name === "groq")?.model).toBe("llama-3.3-70b-versatile");
+  });
+
+  it("uses environment providers only while nothing usable is saved", async () => {
+    const { db } = fakeDb();
+    expect((await resolveProviders(() => [env("openai")], {} as NodeJS.ProcessEnv, db)).map((p) => p.name)).toEqual(["openai"]);
+  });
+
+  it("a provider with fallback switched off is never used behind the primary, but can be the primary itself", async () => {
+    const { db } = fakeDb();
+    await saveProvider(save({ provider: "mistral", model: "ml", priority: 10 }), db);
+    await saveProvider(save({ provider: "groq", priority: 20, useAsFallback: false }), db);
+    await saveProvider(save({ provider: "deepseek", model: "dc", priority: 30, useAsFallback: true }), db);
+    expect((await resolveProviders(() => [], {} as NodeJS.ProcessEnv, db)).map((p) => p.name)).toEqual(["mistral", "deepseek"]);
+    clearProviderCache();
+    await saveProvider(save({ provider: "mistral", model: "ml", priority: 30, apiKey: "" }), db);
+    await saveProvider(save({ provider: "groq", priority: 5, useAsFallback: false }), db);
+    expect((await resolveProviders(() => [], {} as NodeJS.ProcessEnv, db)).map((p) => p.name)[0]).toBe("groq");
   });
 
   it("uses the environment alone when the settings table cannot be read", async () => {
@@ -266,7 +290,7 @@ describe("cost and usage", () => {
     await saveProvider(save({ inputPricePerM: 1, outputPricePerM: 2 }), db);
     const rows = await usageSummary(30, db);
     const groq = rows.find((r) => r.provider === "groq");
-    expect(groq).toMatchObject({ calls: 10, failures: 2, inputTokens: 8000, outputTokens: 2000, avgLatencyMs: 520 });
+    expect(groq).toMatchObject({ calls: 10, failures: 2, inputTokens: 8000, outputTokens: 2000, avgLatencyMs: 520, errorCategories: { TIMEOUT: 2 } });
     expect(groq?.estimatedCost).toBe(0.05);
     expect(rows.find((r) => r.provider === "openai")?.estimatedCost).toBeNull();
   });

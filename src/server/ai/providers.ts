@@ -1,4 +1,5 @@
 import { resolveProviders } from "./config";
+import { AiProviderUnavailableError, classifyAiError } from "./errors";
 import { AnthropicProvider } from "./anthropic";
 import { OpenAIProvider } from "./openai";
 import { AiNotConfiguredError, type AiProvider, type CompletionRequest, type CompletionResponse } from "./types";
@@ -14,6 +15,13 @@ function build(name: string, env: NodeJS.ProcessEnv): AiProvider | null {
   if (name === "openai" && env.OPENAI_API_KEY) {
     return new OpenAIProvider(env.OPENAI_API_KEY, env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL);
   }
+  if (name === "freellmapi" && env.FREELLMAPI_API_KEY) {
+    return new OpenAIProvider(env.FREELLMAPI_API_KEY, env.FREELLMAPI_MODEL || "auto", {
+      name: "freellmapi",
+      baseURL: env.FREELLMAPI_BASE_URL || "http://localhost:3001/v1",
+      tokenParam: "max_tokens",
+    });
+  }
   return null;
 }
 
@@ -28,12 +36,16 @@ export function getConfiguredProviders(env: NodeJS.ProcessEnv = process.env): Ai
   return providers;
 }
 
-/** Tries each provider in order; the last error is thrown if all fail. */
 export interface FallbackHooks {
   /** Called for every provider that failed, so the failure can be counted. */
   onFailure?: (provider: AiProvider, error: unknown, latencyMs: number) => void;
 }
 
+/**
+ * Tries each provider in order. If all fail, throws AiProviderUnavailableError carrying the category of the last
+ * failure (never its message, which can contain request details). Moving to the next provider is logged with the
+ * provider names and the category only.
+ */
 export async function completeWithFallback(
   providers: AiProvider[],
   request: CompletionRequest,
@@ -41,7 +53,7 @@ export async function completeWithFallback(
 ): Promise<CompletionResponse> {
   if (providers.length === 0) throw new AiNotConfiguredError();
   let lastError: unknown;
-  for (const provider of providers) {
+  for (const [index, provider] of providers.entries()) {
     const started = Date.now();
     try {
       const response = await provider.complete(request);
@@ -50,10 +62,11 @@ export async function completeWithFallback(
       if (request.signal?.aborted) throw error;
       hooks.onFailure?.(provider, error, Date.now() - started);
       lastError = error;
-      console.error(`AI provider ${provider.name} failed:`, error instanceof Error ? error.message : "unknown error");
+      const next = providers[index + 1];
+      console.error(`AI provider ${provider.name} failed (${classifyAiError(error)})${next ? `; trying ${next.name}` : "; no more providers"}`);
     }
   }
-  throw lastError;
+  throw new AiProviderUnavailableError(classifyAiError(lastError), providers.map((p) => p.name), providers.length > 1);
 }
 
 /** Providers for a chat request: the ones saved in the admin AI page first, then environment-variable ones. */

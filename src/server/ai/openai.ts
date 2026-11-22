@@ -29,6 +29,23 @@ export function toOpenAIMessages(system: string, messages: ChatMessage[]): OpenA
   return out;
 }
 
+/**
+ * Routing details a gateway reports about a request, kept only if present and only as short plain strings:
+ * response headers such as x-freellm-*, x-route-*, x-provider, x-served-model, and a top-level provider/routing
+ * string in the body. Nothing is assumed to exist; with a plain OpenAI-style server this returns undefined.
+ */
+export function routingFrom(headers: Headers, body: Record<string, unknown>): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  headers.forEach((value, name) => {
+    if (/^x-(freellm|route|routed|provider|served|upstream)/i.test(name) && Object.keys(out).length < 6) out[name.toLowerCase()] = value.slice(0, 100);
+  });
+  for (const key of ["provider", "routing", "routed_to"]) {
+    const v = body[key];
+    if (typeof v === "string" && Object.keys(out).length < 8) out[`body.${key}`] = v.slice(0, 100);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export interface OpenAICompatibleOptions {
   /** Provider id shown in usage records ("openai", "groq", ...). */
   name?: string;
@@ -50,7 +67,7 @@ export class OpenAIProvider implements AiProvider {
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
-    const response = await this.client.chat.completions.create(
+    const { data: response, response: raw } = await this.client.chat.completions.create(
       {
         model: this.model,
         ...(this.tokenParam === "max_tokens" ? { max_tokens: request.maxTokens } : { max_completion_tokens: request.maxTokens }),
@@ -61,7 +78,7 @@ export class OpenAIProvider implements AiProvider {
           : {}),
       },
       { signal: request.signal }
-    );
+    ).withResponse();
 
     const message = response.choices[0]?.message;
     const toolCalls: ToolCall[] = [];
@@ -85,7 +102,9 @@ export class OpenAIProvider implements AiProvider {
         outputTokens: response.usage?.completion_tokens ?? 0,
       },
       provider: this.name,
-      model: this.model,
+      // The model that actually answered (a gateway such as FreeLLMAPI may route "auto" to a real model).
+      model: response.model || this.model,
+      routing: routingFrom(raw.headers, response as unknown as Record<string, unknown>),
     };
   }
 }

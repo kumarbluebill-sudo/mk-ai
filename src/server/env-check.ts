@@ -61,11 +61,23 @@ export function checkEnvironment(env: Env = process.env): EnvIssue[] {
   if (!has(env.ANTHROPIC_API_KEY) && !has(env.OPENAI_API_KEY)) {
     add("ANTHROPIC_API_KEY", "warning", "No AI provider key is set, so chat falls back to basic scripted replies.");
   }
-  for (const name of ["ANTHROPIC_MODEL", "OPENAI_MODEL"]) {
+  for (const name of ["AI_PROVIDER", "AI_FALLBACK_PROVIDER"]) {
+    if (env[name]?.trim() === "freellmapi" && !has(env.FREELLMAPI_API_KEY)) add("FREELLMAPI_API_KEY", "error", `${name} is freellmapi but FREELLMAPI_API_KEY is not set.`);
+  }
+  if (has(env.FREELLMAPI_BASE_URL)) {
+    try {
+      const u = new URL(env.FREELLMAPI_BASE_URL.trim());
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("scheme");
+      if (production && env.VERCEL && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname)) add("FREELLMAPI_BASE_URL", "warning", "Points at localhost, which a Vercel deployment cannot reach. Use a public https address.");
+    } catch {
+      add("FREELLMAPI_BASE_URL", "error", "Is not a valid http or https URL.");
+    }
+  }
+  for (const name of ["ANTHROPIC_MODEL", "OPENAI_MODEL", "FREELLMAPI_MODEL"]) {
     const v = env[name];
     if (has(v) && /\s/.test(v.trim())) add(name, "error", "Looks like a display name, not a model id (it contains spaces).");
   }
-  for (const name of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "VIATOR_SANDBOX_KEY", "VIATOR_PRODUCTION_KEY", "TRAVELDESK_API_KEY", "MAPBOX_API_KEY"]) {
+  for (const name of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "FREELLMAPI_API_KEY", "VIATOR_SANDBOX_KEY", "VIATOR_PRODUCTION_KEY", "TRAVELDESK_API_KEY", "MAPBOX_API_KEY"]) {
     const v = env[name];
     if (has(v) && /["'\s]/.test(v.trim())) add(name, "error", "Contains a quote or whitespace, which usually means it was pasted with extra quotes. The provider will reject it.");
   }

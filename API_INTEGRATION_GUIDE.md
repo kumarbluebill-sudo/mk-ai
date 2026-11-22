@@ -22,3 +22,16 @@ Env: `VIATOR_API_ENV` (`sandbox` | `production`), `VIATOR_SANDBOX_KEY`, `VIATOR_
 
 Routes: `/api/viator/activities`, `/api/viator/activities/search`, `/api/viator/pricing`,
 `/api/viator/booking`, `/api/viator/init`.
+
+
+## FreeLLMAPI (AI provider)
+
+An OpenAI-compatible gateway the chat assistant can use instead of (or before) Anthropic/OpenAI.
+
+1. Start FreeLLMAPI on the same computer (default `http://localhost:3001/v1`) and create an API key in it.
+2. Local development: put `FREELLMAPI_API_KEY="..."` in `.env.local` and set `AI_PROVIDER=freellmapi`, or open **/admin/ai** (platform admin) and fill in FreeLLMAPI: base URL, key, model (`auto` or a model from **Load models**), then **Test connection**.
+3. A successful test shows "Connection successful" with the number of models listed and which model answered. Any other message names the cause (authentication, server unavailable, invalid model, rate limit, timeout).
+4. Order and fallback: the first enabled provider is the primary. Tick "use as a fallback" on others you want to run when it fails; leave it off to guarantee they never run behind it.
+5. **The live site cannot reach `localhost`.** For Vercel, FreeLLMAPI needs a public `https` address; until then leave it disabled there.
+
+Manual check that has not been run yet (needs the real service): Test connection; Load models; a multi-turn chat; a request that makes the assistant call a tool and build an itinerary; stop the gateway and confirm the clear error (and the fallback, if one is allowed).

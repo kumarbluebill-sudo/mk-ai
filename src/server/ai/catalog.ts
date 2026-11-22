@@ -5,7 +5,7 @@
  * Capabilities are what the vendors document for their default chat models, NOT something this code has verified
  * against a live account: a provider counts as tested only after "Test connection" has succeeded in the admin page.
  */
-export const PROVIDER_IDS = ["anthropic", "openai", "gemini", "mistral", "deepseek", "groq", "openrouter", "ollama"] as const;
+export const PROVIDER_IDS = ["anthropic", "openai", "gemini", "mistral", "deepseek", "groq", "openrouter", "ollama", "freellmapi"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export interface ProviderInfo {
@@ -32,6 +32,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   deepseek: { id: "deepseek", label: "DeepSeek", baseUrl: "https://api.deepseek.com", adapter: "openai-compatible", tokenParam: "max_tokens", needsKey: true, tools: "yes", exampleModel: "deepseek-chat" },
   groq: { id: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1", adapter: "openai-compatible", tokenParam: "max_tokens", needsKey: true, tools: "model", exampleModel: "llama-3.3-70b-versatile" },
   openrouter: { id: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", adapter: "openai-compatible", tokenParam: "max_tokens", needsKey: true, tools: "model", exampleModel: "anthropic/claude-sonnet-4.5" },
+  freellmapi: { id: "freellmapi", label: "FreeLLMAPI", baseUrl: "http://localhost:3001/v1", adapter: "openai-compatible", tokenParam: "max_tokens", needsKey: true, tools: "model", exampleModel: "auto", note: "An OpenAI-compatible gateway. \"auto\" lets it choose the model; use Load models to see the real model ids it offers. localhost only works when this app and FreeLLMAPI run on the same computer; the live site needs a public https address." },
   ollama: { id: "ollama", label: "Ollama / local model", baseUrl: "http://localhost:11434/v1", adapter: "openai-compatible", tokenParam: "max_tokens", needsKey: false, tools: "model", exampleModel: "llama3.1", note: "Must be reachable from the server. A model running on your own computer is not reachable from Vercel." },
 };
 
@@ -55,7 +56,7 @@ export function validateBaseUrl(provider: ProviderId, raw: string): { ok: true; 
   const host = u.hostname.toLowerCase();
   if (/^169\.254\./.test(host) || host === "metadata.google.internal" || host === "[fd00:ec2::254]") return { ok: false, reason: "That address is not allowed." };
   const local = host === "localhost" || host === "127.0.0.1" || host === "[::1]";
-  if (local && provider !== "ollama") return { ok: false, reason: "Localhost addresses are only for Ollama." };
+  if (local && provider !== "ollama" && provider !== "freellmapi") return { ok: false, reason: "Localhost addresses are only for Ollama and FreeLLMAPI." };
   if (u.protocol === "http:" && !local && !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return { ok: false, reason: "Use https for remote providers." };
   return { ok: true, url: u.toString() };
 }
