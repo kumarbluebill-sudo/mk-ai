@@ -153,3 +153,7 @@
 - All Viator routes require sign-in (`/api/viator/init` requires `supplier:manage`).
 - `.env.example` moved to the repo root and completed. `/debug` disabled in production.
 - Viator routes report `liveInventory: true` only in the production environment (was always true).
+
+### FreeLLMAPI verified against a real service
+- Tested against the Windows desktop app (`http://127.0.0.1:31415/v1`): model listing, plain completion with `auto`, a tool call, and a multi-turn conversation all worked. Routing details (`x-routed-via`, `x-fallback-trail`, body `_routed_via`) are now captured in the usage log.
+- Opt-in test: `src/server/ai/freellmapi.live.test.ts` (skipped unless `FREELLMAPI_API_KEY` is set).

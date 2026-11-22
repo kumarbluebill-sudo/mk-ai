@@ -28,7 +28,7 @@ Routes: `/api/viator/activities`, `/api/viator/activities/search`, `/api/viator/
 
 An OpenAI-compatible gateway the chat assistant can use instead of (or before) Anthropic/OpenAI.
 
-1. Start FreeLLMAPI on the same computer (default `http://localhost:3001/v1`) and create an API key in it.
+1. Start FreeLLMAPI on the same computer (server version: `http://localhost:3001/v1`; the Windows desktop app listens on `http://127.0.0.1:31415/v1`, so set the base URL to match) and create an API key in it.
 2. Local development: put `FREELLMAPI_API_KEY="..."` in `.env.local` and set `AI_PROVIDER=freellmapi`, or open **/admin/ai** (platform admin) and fill in FreeLLMAPI: base URL, key, model (`auto` or a model from **Load models**), then **Test connection**.
 3. A successful test shows "Connection successful" with the number of models listed and which model answered. Any other message names the cause (authentication, server unavailable, invalid model, rate limit, timeout).
 4. Order and fallback: the first enabled provider is the primary. Tick "use as a fallback" on others you want to run when it fails; leave it off to guarantee they never run behind it.

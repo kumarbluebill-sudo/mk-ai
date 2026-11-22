@@ -37,11 +37,17 @@ export function toOpenAIMessages(system: string, messages: ChatMessage[]): OpenA
 export function routingFrom(headers: Headers, body: Record<string, unknown>): Record<string, string> | undefined {
   const out: Record<string, string> = {};
   headers.forEach((value, name) => {
-    if (/^x-(freellm|route|routed|provider|served|upstream)/i.test(name) && Object.keys(out).length < 6) out[name.toLowerCase()] = value.slice(0, 100);
+    if (/^x-(freellm|route|routed|fallback|provider|served|upstream)/i.test(name) && Object.keys(out).length < 6) out[name.toLowerCase()] = value.slice(0, 100);
   });
   for (const key of ["provider", "routing", "routed_to"]) {
     const v = body[key];
     if (typeof v === "string" && Object.keys(out).length < 8) out[`body.${key}`] = v.slice(0, 100);
+  }
+  // FreeLLMAPI reports where it sent the request as { platform, model }.
+  const via = body["_routed_via"];
+  if (via && typeof via === "object" && Object.keys(out).length < 8) {
+    const { platform, model } = via as { platform?: unknown; model?: unknown };
+    if (typeof platform === "string" && typeof model === "string") out["body._routed_via"] = `${platform}/${model}`.slice(0, 100);
   }
   return Object.keys(out).length ? out : undefined;
 }
