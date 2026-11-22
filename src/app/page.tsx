@@ -27,6 +27,7 @@ export default function HomePage() {
   const [active, setActive] = useState("Overview");
   const [query, setQuery] = useState("");
   const [chat, setChat] = useState<ChatSession | null>(null);
+  const [details, setDetails] = useState({ destination: "", start: "", end: "", adults: "2", children: "0", budget: "" });
   const [drawer, setDrawer] = useState(false);
   const [trips, setTrips] = useState<Conversation[]>([]);
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
@@ -46,11 +47,20 @@ export default function HomePage() {
   // The search box is the chat: submitting starts (or continues) a conversation with the agent.
   const handleSearch = (event?: FormEvent) => {
     event?.preventDefault();
-    const prompt = query.trim();
+    const parts: string[] = [];
+    if (query.trim()) parts.push(query.trim());
+    if (details.destination.trim()) parts.push(`Destination: ${details.destination.trim()}`);
+    if (details.start) parts.push(`Travel dates: ${details.start}${details.end ? ` to ${details.end}` : ""}`);
+    if (details.destination.trim() || details.start || query.trim()) {
+      parts.push(`Travellers: ${Number(details.adults) || 1} adult(s)${Number(details.children) > 0 ? `, ${Number(details.children)} child(ren)` : ""}`);
+    }
+    if (details.budget.trim()) parts.push(`Budget: ${details.budget.trim()}`);
+    const prompt = parts.join(". ");
     if (!prompt) return;
     setChat({ key: Date.now(), prompt });
     setActive("New trip");
     setQuery("");
+    setDetails({ destination: "", start: "", end: "", adults: "2", children: "0", budget: "" });
   };
 
   const startTrip = (prompt: string) => {
@@ -106,7 +116,13 @@ export default function HomePage() {
           {selected ? <DestinationDetail destination={selected} onBack={() => setSelected(null)} onStart={(name) => { setSelected(null); startTrip(`Plan a trip to ${name}`); }} /> : <>
             <section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-dot" /> MADE FOR THE WAY YOU TRAVEL</div><h1>{active === "Overview" ? <>Travel that feels<br className="desktop-break" /> <em>like you.</em></> : sectionTitle}</h1><p className="welcome-copy">A thoughtful itinerary starts with a conversation.<br className="desktop-break" /> Tell us what you have in mind — we’ll take it from there.</p></div><div className="welcome-stamp"><Globe2 size={18} /><span>Good journeys<br />start with a little wonder.</span></div></section>
 
-            <section className="search-panel"><form onSubmit={handleSearch} className="prompt-form"><div className="prompt-icon"><Sparkles size={18} /></div><textarea id="trip-prompt" rows={2} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Where would you like to go? Tell us the little details…" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSearch(); } }} /><button className="send-button" type="submit" aria-label="Search trips" disabled={!query.trim()}><ArrowRight size={19} /></button></form><div className="prompt-footer"><div className="prompt-hints"><span><MapPin size={13} /> Destination</span><span><CalendarDays size={13} /> Dates</span><span><Users size={13} /> Travellers</span><span><Wallet size={13} /> Budget</span></div><button className="voice-button" type="button" title="Voice input coming soon"><span className="voice-wave">▮▮▮</span> Voice <span className="coming-soon">SOON</span></button></div></section>
+            <section className="search-panel"><form onSubmit={handleSearch} className="prompt-form"><div className="prompt-icon"><Sparkles size={18} /></div><textarea id="trip-prompt" rows={2} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Where would you like to go? Tell us the little details…" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSearch(); } }} /><button className="send-button" type="submit" aria-label="Search trips" disabled={!query.trim() && !details.destination.trim()}><ArrowRight size={19} /></button></form><div className="prompt-footer" style={{ flexWrap: "wrap", gap: 8, padding: "8px 0" }}>
+              <label className="prompt-hints" style={{ gap: 6 }}><MapPin size={13} /><input aria-label="Destination" placeholder="Destination" value={details.destination} onChange={(e) => setDetails({ ...details, destination: e.target.value })} style={{ width: 120, border: 0, outline: 0, background: "transparent", fontSize: 12 }} /></label>
+              <label className="prompt-hints" style={{ gap: 6 }}><CalendarDays size={13} /><input aria-label="From date" type="date" value={details.start} onChange={(e) => setDetails({ ...details, start: e.target.value })} style={{ border: 0, outline: 0, background: "transparent", fontSize: 12 }} /><span>to</span><input aria-label="To date" type="date" value={details.end} min={details.start} onChange={(e) => setDetails({ ...details, end: e.target.value })} style={{ border: 0, outline: 0, background: "transparent", fontSize: 12 }} /></label>
+              <label className="prompt-hints" style={{ gap: 6 }}><Users size={13} /><input aria-label="Adults" type="number" min={1} max={30} value={details.adults} onChange={(e) => setDetails({ ...details, adults: e.target.value })} style={{ width: 40, border: 0, outline: 0, background: "transparent", fontSize: 12 }} /><span>adults</span><input aria-label="Children" type="number" min={0} max={30} value={details.children} onChange={(e) => setDetails({ ...details, children: e.target.value })} style={{ width: 40, border: 0, outline: 0, background: "transparent", fontSize: 12 }} /><span>children</span></label>
+              <label className="prompt-hints" style={{ gap: 6 }}><Wallet size={13} /><input aria-label="Budget" placeholder="Budget (e.g. USD 3000)" value={details.budget} onChange={(e) => setDetails({ ...details, budget: e.target.value })} style={{ width: 150, border: 0, outline: 0, background: "transparent", fontSize: 12 }} /></label>
+            </div>
+          </section>
 
             <div className="quick-prompts"><span className="quick-label">NEED A LITTLE INSPIRATION?</span><div className="prompt-chips"><button onClick={() => startTrip("A relaxed beach escape")}>☼ &nbsp;Somewhere by the sea</button><button onClick={() => startTrip("A long weekend in Japan")}>↗ &nbsp;A long weekend away</button><button onClick={() => startTrip("A family trip with the kids")}>♡ &nbsp;A family adventure</button></div></div>
 
