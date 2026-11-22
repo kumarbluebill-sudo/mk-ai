@@ -164,6 +164,12 @@ export function ChatInterface({ embedded = false, initialMessage, initialConvers
         signal: controller.signal,
       });
 
+      if (response.status === 401) {
+        // Stale or missing session (e.g. the database changed): send the user to sign in again.
+        window.location.assign("/login?next=/");
+        throw new Error("Your session has expired. Redirecting to sign in…");
+      }
+
       if (!response.ok || !response.body) {
         const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
         throw new Error(data.message || data.error || "Chat request failed.");
