@@ -9,6 +9,11 @@ export interface PriceLine {
   unitCost: number;
   quantity: number;
   currency: string;
+  /**
+   * Markup for this line alone (chosen by the pricing rules). Percentage applies to the line's cost and the fixed
+   * amount is added once for the line. It is added to any package-level `markup` of the input.
+   */
+  markup?: MarkupRule;
 }
 
 export interface MarkupRule {
@@ -49,7 +54,7 @@ export interface PriceBreakdown {
   taxes: number;
   taxLines: TaxLine[];
   total: number;
-  lines: { name: string; quantity: number; unitCost: number; lineTotal: number }[];
+  lines: { name: string; quantity: number; unitCost: number; lineTotal: number; /** Markup from the line's own rule (package-level markup is not split across lines). */ markup: number }[];
 }
 
 export class PricingError extends Error {
@@ -81,13 +86,23 @@ export function calculatePackagePrice(input: PriceInput): PriceBreakdown {
     quantity: l.quantity,
     unitCost: l.unitCost,
     lineMinor: toMinor(l.unitCost) * l.quantity,
+    markupMinor: 0,
   }));
   const subtotal = lines.reduce((s, l) => s + l.lineMinor, 0);
+
+  // Line markups are rounded per line, so the lines always add up to the total shown.
+  input.lines.forEach((l, i) => {
+    const linePct = l.markup?.percentage ?? 0;
+    const lineFixed = toMinor(l.markup?.fixedAmount ?? 0);
+    if (linePct < 0 || lineFixed < 0) throw new PricingError(`Markup cannot be negative ("${l.name}")`);
+    lines[i].markupMinor = Math.round((lines[i].lineMinor * linePct) / 100) + lineFixed;
+  });
+  const lineMarkups = lines.reduce((s, l) => s + l.markupMinor, 0);
 
   const pct = input.markup?.percentage ?? 0;
   const fixed = toMinor(input.markup?.fixedAmount ?? 0);
   if (pct < 0 || fixed < 0) throw new PricingError("Markup cannot be negative");
-  const markup = Math.round((subtotal * pct) / 100) + fixed;
+  const markup = lineMarkups + Math.round((subtotal * pct) / 100) + fixed;
 
   const discount = toMinor(input.discount ?? 0);
   if (discount < 0 || discount > subtotal + markup) throw new PricingError("Invalid discount");
@@ -129,6 +144,7 @@ export function calculatePackagePrice(input: PriceInput): PriceBreakdown {
       quantity: l.quantity,
       unitCost: l.unitCost,
       lineTotal: toMajor(l.lineMinor),
+      markup: toMajor(l.markupMinor),
     })),
   };
 }

@@ -15,6 +15,15 @@ interface Created {
   subtotal?: number;
   markup?: number;
 }
+interface Margin {
+  currency: string;
+  supplierCost: number;
+  markup: number;
+  discount: number;
+  grossMargin: number;
+  commission: number;
+  netMargin: number;
+}
 interface Warnings {
   unpricedItems: string[];
   itemsNotVerifiedLive: string[];
@@ -32,7 +41,7 @@ export default function QuotePanel({ conversationId }: { conversationId: string 
   const [validDays, setValidDays] = useState("3");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ q: Created; warnings: Warnings } | null>(null);
+  const [result, setResult] = useState<{ q: Created; warnings: Warnings; margin?: Margin } | null>(null);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -56,11 +65,11 @@ export default function QuotePanel({ conversationId }: { conversationId: string 
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as { quotation?: Created; warnings?: Warnings; error?: string; message?: string };
+      const data = (await res.json()) as { quotation?: Created; warnings?: Warnings; margin?: Margin; error?: string; message?: string };
       if (!res.ok || !data.quotation || !data.warnings) {
         throw new Error(data.message ?? (data.error === "Invalid quotation options" ? "Check the numbers you entered." : (data.error ?? "Could not create the quotation")));
       }
-      setResult({ q: data.quotation, warnings: data.warnings });
+      setResult({ q: data.quotation, warnings: data.warnings, margin: data.margin });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the quotation");
     } finally {
@@ -122,6 +131,13 @@ export default function QuotePanel({ conversationId }: { conversationId: string 
               <tr className="border-t font-semibold"><td>Total</td><td className="text-right">{money(result.q.total, result.q.currency)}</td></tr>
             </tbody>
           </table>
+          {result.margin && (
+            <p className="rounded border border-dashed p-2 text-xs text-gray-700" aria-label="Internal margin">
+              Internal, never on the customer&apos;s document: supplier cost {money(result.margin.supplierCost, result.margin.currency)} · markup {money(result.margin.markup, result.margin.currency)}
+              {result.margin.discount > 0 ? ` − discount ${money(result.margin.discount, result.margin.currency)}` : ""} = margin {money(result.margin.grossMargin, result.margin.currency)}
+              {result.margin.commission > 0 ? ` − commission ${money(result.margin.commission, result.margin.currency)} = net ${money(result.margin.netMargin, result.margin.currency)}` : ""}.
+            </p>
+          )}
           {result.warnings.unpricedItems.length > 0 && (
             <p className="text-xs text-amber-800">Not priced (not in the total): {result.warnings.unpricedItems.join(", ")}</p>
           )}

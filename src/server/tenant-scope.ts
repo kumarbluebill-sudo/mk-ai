@@ -18,6 +18,7 @@ export const TENANT_MODELS = new Set([
   "CompanySettings",
   "SupplierCredential",
   "AiUsage",
+  "LedgerEntry",
   "Membership",
   "Subscription",
 ]);

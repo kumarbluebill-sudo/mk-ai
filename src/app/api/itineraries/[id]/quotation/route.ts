@@ -1,3 +1,4 @@
+import { can } from "@/server/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { createQuotation, QuotationError, quoteOptionsSchema, visiblePrice } from "@/server/quotation/service";
 import { rateLimit } from "@/server/rate-limit";
@@ -33,6 +34,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       {
         success: true,
         quotation: { id: q.id, reference: q.reference, status: "DRAFT", validUntil: q.validUntil, ...visiblePrice(ctx, q.price) },
+        // Supplier cost, markup, commission and margin: only for roles allowed to see cost.
+        ...(can(ctx.role, "cost:view") ? { margin: q.margin } : {}),
         warnings: q.warnings,
       },
       { status: 201 }

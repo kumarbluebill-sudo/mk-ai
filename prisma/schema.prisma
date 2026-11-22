@@ -115,6 +115,7 @@ model Tenant {
   auditLogs           AuditLog[]
   aiUsage             AiUsage[]
   subscription        Subscription?
+  ledgerEntries       LedgerEntry[]
 }
 
 model Membership {
@@ -577,6 +578,19 @@ model MarkupSetting {
   currency    String    @default("INR")
   active      Boolean   @default(true)
   supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  /// "MARKUP" (what the agency adds to supplier cost) or "COMMISSION" (what a staff member or sub-agent earns).
+  kind        String    @default("MARKUP")
+  name        String    @default("")
+  /// Conditions: an empty one matches everything. More conditions = more specific = chosen first.
+  supplierKey String?
+  productType String?
+  destination String?
+  customerId  String?
+  /// For COMMISSION rules: the staff member who earns it.
+  userId      String?
+  /// Lower number wins between rules that are equally specific.
+  priority    Int       @default(100)
+  createdAt   DateTime  @default(now())
 
   @@index([tenantId])
 }
@@ -703,4 +717,27 @@ model SupplierCall {
   createdAt DateTime @default(now())
 
   @@index([supplier, createdAt])
+}
+
+/// Append-only financial history. Rows are never updated or deleted (a database trigger refuses both);
+/// a correction is a new row with `reversesId` pointing at the row it cancels. Amounts are signed.
+model LedgerEntry {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quotationId String?
+  bookingId   String?
+  /// SUPPLIER_COST, MARKUP, DISCOUNT, TAX, SELLING_TOTAL, COMMISSION
+  kind        String
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String
+  supplierKey String?
+  label       String?
+  ruleId      String?
+  userId      String?
+  reversesId  String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, quotationId])
+  @@index([tenantId, createdAt])
 }

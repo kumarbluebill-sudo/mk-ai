@@ -3,7 +3,7 @@
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarCheck, LogOut, MapPinned, MessageCircle, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, LogOut, MapPinned, MessageCircle, Percent, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Home", icon: MessageCircle },
@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/bookings", label: "Bookings", icon: CalendarCheck },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/team", label: "Team", icon: Users },
+  { href: "/settings/pricing", label: "Pricing", icon: Percent },
 ];
 
 const HIDDEN = ["/", "/login", "/register", "/offline", "/debug"];

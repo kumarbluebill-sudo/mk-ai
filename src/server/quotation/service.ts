@@ -5,6 +5,9 @@ import { assertWithinLimit } from "@/server/billing/limits";
 import { can } from "@/server/permissions";
 import type { TenantContext } from "@/server/tenant-context";
 import type { Itinerary } from "@/server/travel/itinerary";
+import { marginSummary, quotationLedgerDrafts, type CommissionInput, type LedgerDraft, type LineAttribution } from "@/server/pricing/ledger";
+import { productTypeOf, selectCommissionRule, selectMarkupRule } from "@/server/pricing/rules";
+import { toRule } from "@/server/pricing/service";
 import { calculatePackagePrice, PricingError, type PriceBreakdown } from "@/server/travel/pricing";
 import { buildQuoteDocument, type QuoteDocument } from "./document";
 import { renderQuotePdf } from "./pdf";
@@ -53,28 +56,39 @@ export async function createQuotation(ctx: TenantContext, itinerary: Itinerary, 
   );
   if (priced.length === 0) throw new QuotationError("NOTHING_PRICED", "No itinerary item has a price yet.");
 
-  const markupRow = await ctx.db.markupSetting.findFirst({ where: { active: true, supplierId: null } });
+  const customer = await ownCustomer(ctx);
+  if (!customer) throw new QuotationError("NO_CUSTOMER_PROFILE", "Customer profile not found.");
+
+  // One markup rule per line (the most specific one that matches); see src/server/pricing/rules.ts.
+  const rules = (await ctx.db.markupSetting.findMany({ where: { active: true }, take: 200 })).map(toRule);
+  const attributions: LineAttribution[] = [];
   let price: PriceBreakdown;
   try {
     price = calculatePackagePrice({
-      lines: priced.map(({ item }) => ({ name: item.title, unitCost: item.price as number, quantity: 1, currency: item.currency as string })),
+      lines: priced.map(({ item }) => {
+        const supplierKey = item.supplier ? item.supplier.toLowerCase() : null;
+        const rule = selectMarkupRule(rules, { supplierKey, productType: productTypeOf(item.category), destination: itinerary.destination, customerId: customer.id, currency: item.currency as string });
+        attributions.push({ supplierKey, ruleId: rule?.id ?? null });
+        return {
+          name: item.title,
+          unitCost: item.price as number,
+          quantity: 1,
+          currency: item.currency as string,
+          markup: rule ? { percentage: rule.percentage ?? undefined, fixedAmount: rule.fixedAmount ?? undefined } : undefined,
+        };
+      }),
       taxPercent: options.taxPercent,
       gst: options.gst,
       discount: options.discount,
-      markup: markupRow
-        ? {
-            percentage: markupRow.percentage ? Number(markupRow.percentage) : undefined,
-            fixedAmount: markupRow.fixedAmount ? Number(markupRow.fixedAmount) : undefined,
-          }
-        : undefined,
     });
   } catch (error) {
     if (error instanceof PricingError) throw new QuotationError("PRICING_ERROR", error.message);
     throw error;
   }
 
-  const customer = await ownCustomer(ctx);
-  if (!customer) throw new QuotationError("NO_CUSTOMER_PROFILE", "Customer profile not found.");
+  const commissionRule = selectCommissionRule(rules, ctx.userId);
+  const commission: CommissionInput | undefined = commissionRule ? { userId: ctx.userId, ruleId: commissionRule.id, percentage: commissionRule.percentage as number } : undefined;
+  const ledger: LedgerDraft[] = quotationLedgerDrafts(price, attributions, commission);
   const company = await ctx.db.companySettings.findFirst();
 
   const issuedAt = new Date();
@@ -134,7 +148,7 @@ export async function createQuotation(ctx: TenantContext, itinerary: Itinerary, 
         },
       },
     });
-    return tx.quotation.create({
+    const created = await tx.quotation.create({
       data: {
         tenantId: ctx.tenantId,
         customerId: customer.id,
@@ -151,6 +165,21 @@ export async function createQuotation(ctx: TenantContext, itinerary: Itinerary, 
         snapshot: document as unknown as Prisma.InputJsonValue,
       },
     });
+    // The financial history of this quotation, written in the same transaction so the two can never disagree.
+    await tx.ledgerEntry.createMany({
+      data: ledger.map((d) => ({
+        tenantId: ctx.tenantId,
+        quotationId: created.id,
+        kind: d.kind,
+        amount: d.amount,
+        currency: d.currency,
+        supplierKey: d.supplierKey ?? null,
+        label: d.label ?? null,
+        ruleId: d.ruleId ?? null,
+        userId: d.userId ?? null,
+      })),
+    });
+    return created;
   });
 
   void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "quotation.created", entity: "Quotation", entityId: quotation.id, metadata: { reference } });
@@ -160,6 +189,8 @@ export async function createQuotation(ctx: TenantContext, itinerary: Itinerary, 
     reference,
     validUntil: document.validUntil,
     price,
+    /** Supplier cost, markup, commission and margin. Only for roles with cost:view; the route removes it for others. */
+    margin: marginSummary(ledger),
     document,
     warnings: {
       unpricedItems: unpriced,
