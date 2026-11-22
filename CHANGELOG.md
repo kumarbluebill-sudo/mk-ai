@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Designer polish
+- **Drag and drop** stops within a day or onto another day (same validated `move_item` patch as the arrows, which stay for keyboard use). A browser E2E drags a stop and checks the saved order; it caught a real timing bug (drag state read before re-render), fixed with a ref.
+- **Category icons** next to each stop (decorative; the category name is still printed).
+- **Walking journeys:** a Road / Walking switch asks Mapbox for the walking profile (checked against the live API). **Public-transport legs are not offered**: Mapbox has no transit routing, and a made-up transit time would break the "no invented data" rule.
+
 ### Book from a trip
 - Traveldesk items in the designer have a **Book** button that opens `/bookings/new` with that tour and the day's date chosen. Only a plain numeric tour id and a valid date are accepted from the link. Availability, price and slots are still checked with the supplier before anything is reserved; nothing is booked from the link itself. Viator items have no booking flow yet, so they get no button. E2E covers it.
 

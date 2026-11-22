@@ -129,15 +129,17 @@ export interface DrivingLeg {
 /** Mapbox allows 25 coordinates per Directions request. */
 export const MAX_DIRECTIONS_POINTS = 25;
 
-/** One driving leg per consecutive pair of points. */
-export async function drivingLegs(points: readonly LatLng[], env: Env = process.env): Promise<DrivingLeg[]> {
+export type RoutingProfile = "driving" | "walking";
+
+/** One leg per consecutive pair of points, by road (driving, the default) or on foot (walking). */
+export async function drivingLegs(points: readonly LatLng[], env: Env = process.env, profile: RoutingProfile = "driving"): Promise<DrivingLeg[]> {
   const token = mapboxToken(env);
   if (!token) throw new MapboxError("Mapbox is not configured");
   if (points.length < 2) return [];
   if (points.length > MAX_DIRECTIONS_POINTS) throw new MapboxError("Too many stops for one routing request");
 
   const coords = points.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
-  const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving/${coords}`);
+  const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}`);
   url.searchParams.set("overview", "false");
   url.searchParams.set("access_token", token);
 

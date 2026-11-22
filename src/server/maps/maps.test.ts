@@ -161,6 +161,29 @@ describe("routeDays", () => {
   });
 });
 
+describe("walking journeys", () => {
+  it("uses the walking profile and tags legs as walking, and defaults to driving", async () => {
+    const urls = stubFetch(() => json({ routes: [{ legs: [{ distance: 900, duration: 700 }] }] }));
+    await drivingLegs([{ lat: 25.2, lng: 55.27 }, { lat: 25.21, lng: 55.28 }], env, "walking");
+    await drivingLegs([{ lat: 25.2, lng: 55.27 }, { lat: 25.21, lng: 55.28 }], env);
+    expect(urls[0].pathname).toContain("/directions/v5/mapbox/walking/");
+    expect(urls[1].pathname).toContain("/directions/v5/mapbox/driving/");
+
+    const trip = createItinerary({
+      title: "t", destination: "x",
+      days: [{ title: "d", items: [
+        { title: "a", category: "other" as const, status: "UNVERIFIED" as const, lat: 25.2, lng: 55.27 },
+        { title: "b", category: "other" as const, status: "UNVERIFIED" as const, lat: 25.21, lng: 55.28 },
+      ] }],
+    });
+    const fn = vi.fn(async () => [{ distanceKm: 0.9, minutes: 12 }]);
+    const r = await routeDays(trip, fn, "walking");
+    expect(fn).toHaveBeenCalledWith(expect.any(Array), "walking");
+    expect(r.routes[1].legs[0].travel.mode).toBe("walk");
+    expect(r.routes[1].legs[0].travel.estimate).toBe(false);
+  });
+});
+
 describe("optimizedOrder", () => {
   const pts = [
     { lat: 25.2, lng: 55.27 },

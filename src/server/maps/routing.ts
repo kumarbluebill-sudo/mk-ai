@@ -1,7 +1,7 @@
 import type { DayRoute, RouteLeg } from "@/server/travel/geo";
 import { hasCoords } from "@/server/travel/geo";
 import type { Itinerary } from "@/server/travel/itinerary";
-import { drivingLegs, MAX_DIRECTIONS_POINTS, straightLineKm, type DrivingLeg } from "./mapbox";
+import { drivingLegs, MAX_DIRECTIONS_POINTS, straightLineKm, type DrivingLeg, type RoutingProfile } from "./mapbox";
 
 export interface RoutedDays {
   /** Days that were routed by the maps provider. Days not listed keep their straight-line estimates. */
@@ -16,7 +16,8 @@ export interface RoutedDays {
  */
 export async function routeDays(
   itinerary: Itinerary,
-  legsFn: (points: { lat: number; lng: number }[]) => Promise<DrivingLeg[]> = (p) => drivingLegs(p)
+  legsFn: (points: { lat: number; lng: number }[], profile: RoutingProfile) => Promise<DrivingLeg[]> = (p, profile) => drivingLegs(p, process.env, profile),
+  profile: RoutingProfile = "driving"
 ): Promise<RoutedDays> {
   const routes: Record<number, DayRoute> = {};
   const failedDays: number[] = [];
@@ -30,13 +31,13 @@ export async function routeDays(
         return;
       }
       try {
-        const legs = await legsFn(located.map((i) => ({ lat: i.lat, lng: i.lng })));
+        const legs = await legsFn(located.map((i) => ({ lat: i.lat, lng: i.lng })), profile);
         const routed: RouteLeg[] = legs.map((leg, i) => ({
           fromId: located[i].id,
           toId: located[i + 1].id,
           source: "MAPBOX",
           travel: {
-            mode: "drive",
+            mode: profile === "walking" ? "walk" : "drive",
             straightLineKm: straightLineKm(located[i], located[i + 1]),
             distanceKm: leg.distanceKm,
             minutes: leg.minutes,

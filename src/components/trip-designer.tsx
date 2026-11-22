@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QuotePanel from "./quote-panel";
 import type { DayRoute } from "@/server/travel/geo";
 import type { Itinerary, ItineraryDay, ItineraryItem, ItineraryPatch } from "@/server/travel/itinerary";
@@ -12,6 +12,13 @@ import type { Itinerary, ItineraryDay, ItineraryItem, ItineraryPatch } from "@/s
 function bookableTourId(item: ItineraryItem): string | null {
   return item.supplier === "traveldesk" && item.productCode && /^\d{1,10}$/.test(item.productCode) ? item.productCode : null;
 }
+
+/** Decorative icon per kind of stop (the category name is always printed next to it). */
+const CATEGORY_ICON: Record<Category, string> = {
+  flight: "✈️", arrival: "🛬", departure: "🛫", hotel: "🏨", checkin: "🛎️", restaurant: "🍽️", breakfast: "☕",
+  sightseeing: "📍", museum: "🏛️", adventure: "🧗", beach: "🏖️", cruise: "🚢", shopping: "🛍️", transfer: "🚐",
+  bus: "🚌", train: "🚆", walking: "🚶", free_time: "🕒", theme_park: "🎢", other: "•",
+};
 
 const TripMap = dynamic(() => import("./trip-map"), { ssr: false });
 
@@ -197,6 +204,10 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  // The ref is read by the drop handlers: state would not be re-rendered yet when the first dragover arrives.
+  const dragRef = useRef<string | null>(null);
+  const [overKey, setOverKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapDay, setMapDay] = useState(1);
   const [editing, setEditing] = useState<string | null>(null);
@@ -290,15 +301,16 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
 
   const itinerary = view?.itinerary ?? null;
   // Changes whenever the order or coordinates of stops change, so stale routes are never shown.
+  const [travelMode, setTravelMode] = useState<"drive" | "walk">("drive");
   const routeKey = useMemo(
-    () => JSON.stringify(itinerary?.days.map((d) => d.items.map((i) => [i.id, i.lat ?? null, i.lng ?? null]))),
-    [itinerary]
+    () => JSON.stringify([travelMode, itinerary?.days.map((d) => d.items.map((i) => [i.id, i.lat ?? null, i.lng ?? null]))]),
+    [itinerary, travelMode]
   );
   const routing = maps?.routing === true;
   useEffect(() => {
     if (!routing || !itinerary) return;
     let cancelled = false;
-    fetch(`/api/itineraries/${conversationId}/routes`)
+    fetch(`/api/itineraries/${conversationId}/routes?mode=${travelMode}`)
       .then(async (r) => (r.ok ? ((await r.json()) as { routes: Record<number, DayRoute> }) : null))
       .then((data) => {
         if (!cancelled && data) setRouted({ key: routeKey, routes: data.routes });
@@ -309,7 +321,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
     };
     // routeKey captures every change that matters; itinerary itself changes identity on each save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routing, routeKey, conversationId]);
+  }, [routing, routeKey, conversationId, travelMode]);
   const liveRoutes = routed && routed.key === routeKey ? routed.routes : null;
   const day: ItineraryDay | undefined = itinerary?.days.find((d) => d.dayNumber === mapDay) ?? itinerary?.days[0];
   const points = useMemo(
@@ -343,9 +355,20 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
 
       {note && <p role="status" className="rounded bg-green-50 p-3 text-sm text-green-800">{note}</p>}
       {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {routing && (
+        <div className="flex items-center gap-2 text-sm" role="group" aria-label="Journey type">
+          <span className="text-gray-600">Journeys by</span>
+          {(["drive", "walk"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={travelMode === m} onClick={() => setTravelMode(m)}
+              className={`rounded border px-2 py-0.5 ${travelMode === m ? "border-blue-600 bg-blue-50 text-blue-800" : ""}`}>
+              {m === "drive" ? "Road" : "Walking"}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="text-xs text-gray-500">
         {routing
-          ? "Legs marked Mapbox are real driving routes; anything else is a straight-line estimate. "
+          ? "Legs marked Mapbox are real routes; anything else is a straight-line estimate. Public-transport times are not available. "
           : "Distances and times are straight-line estimates, not routed journeys. "}
         Items you add here are never marked as supplier-verified.
       </p>
@@ -398,7 +421,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
             </div>
             {route && route.legs.length > 0 && (
               <p className="text-xs text-gray-500">
-                ~{route.totalKm} km, ~{route.totalMinutes} min of travel between located stops ({route.legs[0]?.source === "MAPBOX" ? "driving, Mapbox" : "estimate"})
+                ~{route.totalKm} km, ~{route.totalMinutes} min of travel between located stops ({route.legs[0]?.source === "MAPBOX" ? `${route.legs[0]?.travel.mode === "walk" ? "walking" : "driving"}, Mapbox` : "estimate"})
                 {route.unlocated > 0 ? ` · ${route.unlocated} item(s) without coordinates not counted` : ""}
               </p>
             )}
@@ -408,7 +431,22 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
               {d.items.map((item, idx) => {
                 const leg = legByTo.get(item.id);
                 return (
-                  <li key={item.id}>
+                  <li
+                    key={item.id}
+                    draggable={!busy && editing === null}
+                    onDragStart={(e) => { dragRef.current = item.id; setDragId(item.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", item.id); }}
+                    onDragEnd={() => { dragRef.current = null; setDragId(null); setOverKey(null); }}
+                    onDragOver={(e) => { if (dragRef.current && dragRef.current !== item.id) { e.preventDefault(); setOverKey(item.id); } }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const moving = dragRef.current;
+                      dragRef.current = null;
+                      setDragId(null);
+                      setOverKey(null);
+                      if (moving && moving !== item.id) void send([{ op: "move_item", itemId: moving, toDay: d.dayNumber, position: idx }]);
+                    }}
+                    className={`${dragId === item.id ? "opacity-50" : ""} ${overKey === item.id ? "border-t-2 border-blue-500" : ""}`}
+                  >
                     {leg && (
                       <p className="mb-1 ml-3 text-xs text-gray-500">
                         ↓ ~{leg.travel.minutes} min {leg.travel.mode === "walk" ? "walk" : "by road"}, ~{leg.travel.distanceKm} km ({leg.source === "MAPBOX" ? "Mapbox" : "estimate"})
@@ -422,6 +460,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
                         <div className="min-w-0 flex-1">
                           <p className="font-medium">
                             {item.startTime && <span className="mr-2 text-sm text-gray-600">{item.startTime}{item.endTime ? `–${item.endTime}` : ""}</span>}
+                            <span aria-hidden="true" className="mr-1">{CATEGORY_ICON[item.category]}</span>
                             {item.title}
                             <span title={STATUS_HELP[item.status]} className={`ml-2 rounded px-1.5 py-0.5 text-xs ${STATUS_STYLE[item.status]}`}>{item.status}</span>
                           </p>
