@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Enforced CSP
+- The Content-Security-Policy is now enforced (was report-only). Scripts still allow `unsafe-inline` (nonces not done), so this blocks foreign origins, frames, plugins and form targets but not inline script injection.
+
 ### Self-hosted fonts
 - DM Sans and DM Serif Display now come from `next/font` (downloaded at build, served from our own domain). Pages no longer contact Google, and the CSP no longer allows fonts.googleapis.com or fonts.gstatic.com. Unit 232, E2E 26/26 (including the CSP-violation browser test) pass.
 

@@ -16,13 +16,13 @@ test.describe("smoke", () => {
     expect(res.headers()["cache-control"]).toContain("no-store");
   });
 
-  test("security headers are present, including a report-only CSP", async () => {
+  test("security headers are present, including an enforced CSP", async () => {
     const ctx = await api();
     const h = (await ctx.get("/login")).headers();
     expect(h["x-content-type-options"]).toBe("nosniff");
     expect(h["x-frame-options"]).toBe("DENY");
     expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
-    expect(h["content-security-policy-report-only"]).toContain("frame-ancestors 'none'");
+    expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(h["x-powered-by"]).toBeUndefined();
   });
 

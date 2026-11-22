@@ -24,7 +24,7 @@ They start **two** production servers on two ports against one database, and dri
 
 | Spec | Proves |
 | --- | --- |
-| `smoke` | health endpoint (no leaks), security headers incl. report-only CSP, protected pages redirect and APIs answer 401, `/debug` absent, pages render without script errors |
+| `smoke` | health endpoint (no leaks), security headers incl. enforced CSP, protected pages redirect and APIs answer 401, `/debug` absent, pages render without script errors |
 | `pwa` | manifest and every icon exist; service worker registers; offline page appears when the network drops; **the worker stores nothing private** (every cached URL is on a short allow-list after a signed-in session); no CSP violations on the main screens |
 | `tenancy` | one agency cannot read, edit, quote, route or list another's trip (404, not 403); another agency sees "not found" in the browser; duplicate emails; a removed member's still-valid session stops working at once |
 | `saas` | 14-day Starter trial from plan data; Starter cannot book; team (temporary password, seat limit, role change, removal); admin console closed to everyone without two-factor (with a real TOTP code); plan changes, overrides, suspension, ended trial, all enforced and audited; plans as data |

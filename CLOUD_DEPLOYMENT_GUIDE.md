@@ -61,6 +61,6 @@ Placing a real Traveldesk booking needs all of: a Traveldesk **production** API 
 ## Still needed for production
 
 - **Error reporting** (e.g. Sentry) and **uptime monitoring** on `/api/health`. Nothing is wired; failures are only in Vercel's logs.
-- **Content-Security-Policy enforcement.** It is sent in report-only mode (see SECURITY_GUIDE.md).
+- **CSP nonces.** The policy is enforced but scripts still allow `unsafe-inline` (see SECURITY_GUIDE.md).
 - Email delivery (invitations, password reset), background jobs, document storage, CDN rules.
 - A staging environment. Today there are only production and the test branch.
