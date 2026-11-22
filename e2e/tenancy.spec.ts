@@ -24,6 +24,7 @@ test.describe("multi-tenant isolation", () => {
     expect((await json<{ itineraries: unknown[] }>(await b.ctx.get("/api/itineraries"))).itineraries).toHaveLength(0);
     expect((await b.ctx.get(`/api/itineraries/${id}`)).status()).toBe(404);
     expect((await b.ctx.get(`/api/itineraries/${id}/routes`)).status()).toBe(404);
+    expect((await b.ctx.post(`/api/itineraries/${id}/optimize`, { data: { day: 1 } })).status()).toBe(404);
     expect((await b.ctx.patch(`/api/itineraries/${id}`, { data: { patches: [{ op: "add_day", title: "hack" }] } })).status()).toBe(404);
     expect((await b.ctx.post(`/api/itineraries/${id}/quotation`, { data: { discount: 0, validDays: 3 } })).status()).toBe(404);
 

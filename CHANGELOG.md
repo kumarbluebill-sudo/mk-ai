@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Optimise a day by road
+- "Optimise order" now asks the Mapbox Optimization API (`POST /api/itineraries/[id]/optimize`) for the best order by road time, applied through a new validated `reorder_day` patch (must list each located stop exactly once). The **first and last stops stay fixed**: a live check showed the API rejects open-ended trips (`destination=any` is `NotImplemented`), and it needs at least 4 located stops and at most 12. When road data is unavailable, too few stops, or any error, the designer falls back to the old straight-line order and **says so** on screen (an estimate). Another agency's trip answers 404. Unit tests cover parsing, rejected answers and the patch; verified against the live API.
+
 ### Error log (no third-party service)
 - Unhandled server errors are recorded by `src/instrumentation.ts` into a new `ErrorLog` table (migration `error_log`, additive), grouped by fingerprint with a count, and listed at **/admin/errors** (platform admin, 2FA) with a "mark resolved" button. Emails, URLs, tokens and long ids are redacted before storing; recording never throws. Unit tests for redaction, grouping and failure safety; E2E checks the endpoint is closed to non-admins.
 - E2E setup now clears the shared rate-limit counters so repeated runs within an hour no longer fail with 429.

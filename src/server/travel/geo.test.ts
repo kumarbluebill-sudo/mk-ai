@@ -94,6 +94,23 @@ describe("itinerary move_item / optimize_day", () => {
     expect(dayRoute(out.days[0].items).totalKm).toBeLessThan(before);
   });
 
+  it("reorder_day applies exactly the given order to located items and keeps unlocated slots", () => {
+    const it = trip();
+    const [a, , nc, c, d] = it.days[0].items;
+    const b = it.days[0].items[1];
+    const out = applyPatch(it, { op: "reorder_day", day: 1, itemIds: [a.id, d.id, c.id, b.id] });
+    expect(titles(out, 1)).toEqual(["A", "D", "no coords", "C", "B"]);
+    expect(nc.title).toBe("no coords");
+  });
+
+  it("reorder_day refuses lists that add, drop, repeat or invent stops", () => {
+    const it = trip();
+    const ids = it.days[0].items.filter((x) => x.lat !== undefined).map((x) => x.id);
+    const bad = [ids.slice(1), [...ids, "ghost"], [ids[0], ids[0], ids[1], ids[2]], [...ids.slice(0, 3), it.days[0].items[2].id]];
+    for (const itemIds of bad) expect(() => applyPatch(it, { op: "reorder_day", day: 1, itemIds })).toThrow(ItineraryError);
+    expect(() => applyPatch(it, { op: "reorder_day", day: 9, itemIds: ids })).toThrow(ItineraryError);
+  });
+
   it("optimize_day does nothing with fewer than three located items", () => {
     const it = trip();
     expect(applyPatch(it, { op: "optimize_day", day: 2 })).toBe(it);

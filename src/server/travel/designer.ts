@@ -1,9 +1,11 @@
 import type { Prisma } from "@/generated/prisma/client";
-import { dayRoute, type DayRoute } from "./geo";
+import { optimizedOrder } from "@/server/maps/mapbox";
+import { dayRoute, hasCoords, type DayRoute } from "./geo";
 import {
   applyPatch,
   createItinerary,
   createItinerarySchema,
+  ItineraryError,
   patchSchema,
   type Itinerary,
   type ItineraryPatch,
@@ -103,6 +105,26 @@ export async function applyDesignerPatches(
   // Scoped client forces tenantId; the id came from ownConversation so it belongs to this tenant.
   await ctx.db.conversation.update({ where: { id: convo.id }, data: { state } });
   return { conversationId: convo.id, title: convo.title ?? "Untitled trip", itinerary: next, routes: routesFor(next) };
+}
+
+/**
+ * Re-orders one day by road using Mapbox. Returns null when the trip is not found; throws MapboxError when
+ * the provider cannot be used, so the caller can fall back to the straight-line "optimize_day".
+ */
+export async function optimizeDayByRoad(
+  ctx: TenantContext,
+  conversationId: string,
+  day: number,
+  orderFn: (points: { lat: number; lng: number }[]) => Promise<number[]> = (p) => optimizedOrder(p)
+): Promise<DesignerView | null> {
+  const view = await getDesignerView(ctx, conversationId);
+  if (!view) return null;
+  if (!view.itinerary) throw new NoItineraryError();
+  const target = view.itinerary.days.find((d) => d.dayNumber === day);
+  if (!target) throw new ItineraryError(`Day ${day} not found`);
+  const located = target.items.filter(hasCoords);
+  const order = await orderFn(located.map((i) => ({ lat: i.lat, lng: i.lng })));
+  return applyDesignerPatches(ctx, conversationId, [{ op: "reorder_day", day, itemIds: order.map((i) => located[i].id) }]);
 }
 
 export const blankTripBody = createItinerarySchema;

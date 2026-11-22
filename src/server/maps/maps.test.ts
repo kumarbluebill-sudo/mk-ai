@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createItinerary } from "@/server/travel/itinerary";
-import { drivingLegs, geocode, isMapboxConfigured, MapboxError, publicMapToken } from "./mapbox";
+import { drivingLegs, geocode, isMapboxConfigured, MapboxError, optimizedOrder, publicMapToken } from "./mapbox";
 import { routeDays } from "./routing";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -158,5 +158,42 @@ describe("routeDays", () => {
     const r = await routeDays(big, fn);
     expect(fn).not.toHaveBeenCalled();
     expect(r.failedDays).toEqual([1]);
+  });
+});
+
+describe("optimizedOrder", () => {
+  const pts = [
+    { lat: 25.2, lng: 55.27 },
+    { lat: 25.1, lng: 55.1 },
+    { lat: 25.21, lng: 55.28 },
+    { lat: 25.0, lng: 55.0 },
+  ];
+
+  it("turns waypoint_index into a visiting order starting at the first point, and never puts the token in errors", async () => {
+    const urls = stubFetch(() => json({ code: "Ok", waypoints: [{ waypoint_index: 0, trips_index: 0 }, { waypoint_index: 2, trips_index: 0 }, { waypoint_index: 1, trips_index: 0 }, { waypoint_index: 3, trips_index: 0 }] }));
+    expect(await optimizedOrder(pts, env)).toEqual([0, 2, 1, 3]);
+    expect(urls[0].pathname).toContain("/optimized-trips/v1/mapbox/driving/");
+    expect(urls[0].searchParams.get("source")).toBe("first");
+    expect(urls[0].searchParams.get("roundtrip")).toBe("false");
+    expect(urls[0].searchParams.get("destination")).toBe("last"); // "any" is NotImplemented on the live API
+  });
+
+  it("rejects unusable answers instead of guessing an order", async () => {
+    stubFetch(() => json({ code: "Ok", waypoints: [{ waypoint_index: 0 }, { waypoint_index: 0 }, { waypoint_index: 1 }, { waypoint_index: 2 }] }));
+    await expect(optimizedOrder(pts, env)).rejects.toThrow(MapboxError);
+    stubFetch(() => json({ code: "Ok", waypoints: [{ waypoint_index: 0, trips_index: 0 }, { waypoint_index: 1, trips_index: 1 }, { waypoint_index: 0, trips_index: 1 }, { waypoint_index: 1, trips_index: 0 }] }));
+    await expect(optimizedOrder(pts, env)).rejects.toThrow(MapboxError);
+    // first or last stop moved
+    stubFetch(() => json({ code: "Ok", waypoints: [{ waypoint_index: 1, trips_index: 0 }, { waypoint_index: 0, trips_index: 0 }, { waypoint_index: 2, trips_index: 0 }, { waypoint_index: 3, trips_index: 0 }] }));
+    await expect(optimizedOrder(pts, env)).rejects.toThrow(/first or last/);
+    stubFetch(() => json({ code: "NoRoute", waypoints: [] }));
+    await expect(optimizedOrder(pts, env)).rejects.toThrow(MapboxError);
+  });
+
+  it("refuses more than 12 stops, needs a key, and needs 4 stops", async () => {
+    const many = Array.from({ length: 13 }, (_, i) => ({ lat: 25 + i / 100, lng: 55 }));
+    await expect(optimizedOrder(many, env)).rejects.toThrow(/up to 12/);
+    await expect(optimizedOrder(pts, {})).rejects.toThrow(/not configured/);
+    await expect(optimizedOrder(pts.slice(0, 3), env)).rejects.toThrow(/at least 4/);
   });
 });

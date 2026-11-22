@@ -191,6 +191,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapDay, setMapDay] = useState(1);
   const [editing, setEditing] = useState<string | null>(null);
@@ -252,6 +253,36 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
     }
   }
 
+  /** Best order by road when Mapbox is available; otherwise by straight-line distance, and says so. */
+  async function optimise(day: number) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    let reason = "";
+    try {
+      const res = await fetch(`/api/itineraries/${conversationId}/optimize`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ day }),
+      });
+      const data = (await res.json()) as View & { error?: string; fallback?: boolean };
+      if (res.ok) {
+        setView(data);
+        setNote(`Day ${day} re-ordered by road time. The first and last stops stay where they are.`);
+        return;
+      }
+      if (!data.fallback) throw new Error(data.error ?? "Could not optimise this day");
+      reason = data.error ?? "Road routing was unavailable";
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not optimise this day");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await send([{ op: "optimize_day", day }]);
+    setNote(`${reason}. Day ${day} was ordered by straight-line distance instead (an estimate).`);
+  }
+
   const itinerary = view?.itinerary ?? null;
   // Changes whenever the order or coordinates of stops change, so stale routes are never shown.
   const routeKey = useMemo(
@@ -305,6 +336,7 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
         </div>
       </header>
 
+      {note && <p role="status" className="rounded bg-green-50 p-3 text-sm text-green-800">{note}</p>}
       {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <p className="text-xs text-gray-500">
         {routing
@@ -348,8 +380,8 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
                 </button>
               </h2>
               <div className="flex gap-2 text-sm">
-                <button disabled={busy || located < 3} title={located < 3 ? "Needs 3+ items with coordinates" : "Re-order by nearest stop"}
-                  onClick={() => void send([{ op: "optimize_day", day: d.dayNumber }])} className="rounded border px-2 py-0.5 disabled:opacity-50">
+                <button disabled={busy || located < 3} title={located < 3 ? "Needs 3+ items with coordinates" : "Re-order the stops to shorten the drive"}
+                  onClick={() => void optimise(d.dayNumber)} className="rounded border px-2 py-0.5 disabled:opacity-50">
                   Optimise order
                 </button>
                 <button disabled={busy || itinerary.days.length === 1}

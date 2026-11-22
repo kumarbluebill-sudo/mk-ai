@@ -126,6 +126,8 @@ export const patchSchema = z.discriminatedUnion("op", [
   }),
   /** Re-order the located items of one day by nearest neighbour; unlocated items keep their slots. */
   z.object({ op: z.literal("optimize_day"), day: z.number().int().min(1) }),
+  /** Put the located items of one day in exactly this order (used with an order computed from road data). */
+  z.object({ op: z.literal("reorder_day"), day: z.number().int().min(1), itemIds: z.array(z.string().min(1)).min(1).max(50) }),
 ]);
 
 export type ItineraryPatch = z.infer<typeof patchSchema>;
@@ -204,6 +206,20 @@ export function applyPatch(it: Itinerary, patch: ItineraryPatch): Itinerary {
       const ordered = nearestNeighbourOrder(located.map((value) => ({ value, at: { lat: value.lat, lng: value.lng } })));
       let next = 0;
       const items = day.items.map((x) => (hasCoords(x) ? ordered[next++].value : x));
+      return { ...it, days: it.days.map((d) => (d === day ? { ...d, items } : d)) };
+    }
+    case "reorder_day": {
+      const day = it.days.find((d) => d.dayNumber === patch.day);
+      if (!day) throw new ItineraryError(`Day ${patch.day} not found`);
+      const located = day.items.filter(hasCoords);
+      const wanted = new Set(patch.itemIds);
+      // Must be exactly the located items of that day, each once: nothing added, dropped or duplicated.
+      if (wanted.size !== patch.itemIds.length || wanted.size !== located.length || !located.every((x) => wanted.has(x.id))) {
+        throw new ItineraryError("The new order must list each located stop of the day exactly once");
+      }
+      const byId = new Map(located.map((x) => [x.id, x]));
+      let next = 0;
+      const items = day.items.map((x) => (hasCoords(x) ? (byId.get(patch.itemIds[next++]) as typeof x) : x));
       return { ...it, days: it.days.map((d) => (d === day ? { ...d, items } : d)) };
     }
     case "remove_day": {
