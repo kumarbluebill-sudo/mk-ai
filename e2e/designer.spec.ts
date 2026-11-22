@@ -40,8 +40,14 @@ test.describe("trip designer", () => {
     await expect(book).toHaveAttribute("href", /\/bookings\/new\?tourId=777&title=Safari\+tour&date=2027-03-01/);
     await expect(rows.nth(0).getByRole("link", { name: "Book" })).toHaveCount(0);
 
-    // Drag the last stop onto the first.
-    await rows.nth(2).dragTo(rows.nth(0));
+    // Drag the last stop onto the first. The drag events are sent directly: Playwright's simulated mouse drag
+    // depends on the browser build and timing (it passed locally and failed on the CI runner), while the
+    // events are exactly what a browser sends and exercise the same handlers.
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+    await rows.nth(2).dispatchEvent("dragstart", { dataTransfer });
+    await rows.nth(0).dispatchEvent("dragover", { dataTransfer });
+    await rows.nth(0).dispatchEvent("drop", { dataTransfer });
+    await page.locator("ol > li").nth(1).dispatchEvent("dragend", { dataTransfer });
     await expect(rows.nth(0)).toContainText("Safari tour");
     const saved = (await (await page.request.get(`${BASE_A}/api/itineraries/${id}`)).json()) as { itinerary: { days: { items: { title: string }[] }[] } };
     expect(saved.itinerary.days[0].items.map((i) => i.title)).toEqual(["Safari tour", "First stop", "Second stop"]);
