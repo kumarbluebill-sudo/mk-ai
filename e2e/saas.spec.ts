@@ -76,6 +76,7 @@ test.describe.serial("plans, team and platform admin", () => {
     expect((await owner.ctx.get("/api/admin/tenants")).status()).toBe(403);
     expect((await (await api()).get("/api/admin/tenants")).status()).toBe(401);
     expect((await owner.ctx.get("/api/admin/system")).status()).toBe(403);
+    expect((await owner.ctx.get("/api/admin/errors")).status()).toBe(403);
 
     // An administrator who has not turned on two-factor is refused too.
     const weak = await newAgency("weakadmin");
@@ -93,6 +94,8 @@ test.describe.serial("plans, team and platform admin", () => {
     expect(list.status()).toBe(200);
     const sys = await json<{ issues: unknown[]; database: { ok: boolean } }>(await admin.ctx.get("/api/admin/system"));
     expect(sys.database.ok).toBe(true);
+    const errs = await json<{ errors: unknown[] }>(await admin.ctx.get("/api/admin/errors"));
+    expect(Array.isArray(errs.errors)).toBe(true);
     // Cross-origin writes are blocked even for an administrator.
     expect((await admin.ctx.patch(`/api/admin/tenants/${tenantId}`, { data: { status: "ACTIVE" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
   });

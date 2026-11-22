@@ -32,7 +32,7 @@ test.describe("smoke", () => {
       expect(res.status(), path).toBe(307);
       expect(res.headers().location, path).toContain("/login");
     }
-    for (const path of ["/api/billing/summary", "/api/itineraries", "/api/bookings", "/api/team", "/api/admin/tenants", "/api/admin/system", "/api/maps/config", "/api/suppliers/status"]) {
+    for (const path of ["/api/billing/summary", "/api/itineraries", "/api/bookings", "/api/team", "/api/admin/tenants", "/api/admin/system", "/api/admin/errors", "/api/maps/config", "/api/suppliers/status"]) {
       expect((await request.get(path)).status(), path).toBe(401);
     }
   });

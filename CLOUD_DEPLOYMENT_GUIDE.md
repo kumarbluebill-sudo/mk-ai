@@ -60,7 +60,7 @@ Placing a real Traveldesk booking needs all of: a Traveldesk **production** API 
 
 ## Still needed for production
 
-- **Error reporting** (e.g. Sentry) and **uptime monitoring** on `/api/health`. Nothing is wired; failures are only in Vercel's logs.
+- **Uptime monitoring** on `/api/health` (nothing wired; use a free monitor such as UptimeRobot). Server errors are recorded in the app itself and listed at /admin/errors; there is no alerting, so someone has to look. A service such as Sentry would add alerts and browser-side errors.
 - **CSP nonces.** The policy is enforced but scripts still allow `unsafe-inline` (see SECURITY_GUIDE.md).
 - Email delivery (invitations, password reset), background jobs, document storage, CDN rules.
 - A staging environment. Today there are only production and the test branch.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Error log (no third-party service)
+- Unhandled server errors are recorded by `src/instrumentation.ts` into a new `ErrorLog` table (migration `error_log`, additive), grouped by fingerprint with a count, and listed at **/admin/errors** (platform admin, 2FA) with a "mark resolved" button. Emails, URLs, tokens and long ids are redacted before storing; recording never throws. Unit tests for redaction, grouping and failure safety; E2E checks the endpoint is closed to non-admins.
+- E2E setup now clears the shared rate-limit counters so repeated runs within an hour no longer fail with 429.
+
 ### Enforced CSP
 - The Content-Security-Policy is now enforced (was report-only). Scripts still allow `unsafe-inline` (nonces not done), so this blocks foreign origins, frames, plugins and form targets but not inline script injection.
 

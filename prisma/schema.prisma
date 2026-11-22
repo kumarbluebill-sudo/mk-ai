@@ -635,3 +635,21 @@ model RateLimitBucket {
 
   @@index([resetAt])
 }
+
+/// Server errors grouped by fingerprint, for the platform admin (see src/server/observability/errors.ts).
+/// Holds no tenant data: messages and stacks are redacted before they are stored.
+model ErrorLog {
+  id          String    @id @default(cuid())
+  fingerprint String    @unique
+  source      String
+  name        String
+  message     String
+  route       String?
+  stack       String?
+  count       Int       @default(1)
+  firstSeen   DateTime  @default(now())
+  lastSeen    DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([lastSeen])
+}
