@@ -148,6 +148,11 @@ export default function BookingDetail({ id }: { id: string }) {
             Download supplier voucher (PDF)
           </a>
         )}
+        {b.canDownloadVoucher && (
+          <a href={`/api/bookings/${id}/voucher?type=agency`} className="rounded border bg-white px-3 py-1.5 text-sm text-blue-700 underline">
+            Download agency voucher (PDF)
+          </a>
+        )}
 
         {b.canCancel && (
           <button

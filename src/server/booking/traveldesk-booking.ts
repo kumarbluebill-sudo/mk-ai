@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { renderVoucher } from "./voucher-pdf";
 import type { Prisma } from "@/generated/prisma/client";
 import { getTravelDeskClient, TravelDeskError, type TravelDeskClient } from "@/integrations/traveldesk/client";
 import { recordAudit } from "@/server/audit";
@@ -600,4 +601,22 @@ export async function getVoucher(ctx: TenantContext, id: string): Promise<{ refe
   }
   void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "booking.voucher_downloaded", entity: "Booking", entityId: id });
   return { reference: details.ourReference, bytes: voucher.bytes };
+}
+
+/** The agency's own voucher, rendered from the stored booking (see voucher-pdf.ts). No supplier call is made. */
+export async function getAgencyVoucher(ctx: TenantContext, id: string): Promise<{ reference: string; bytes: Uint8Array }> {
+  const row = await requireOwn(ctx, id);
+  const view = toView(ctx, row);
+  if (!view.canDownloadVoucher) {
+    throw new BookingError("WRONG_STATE", "A voucher is only available once the supplier has confirmed the booking.");
+  }
+  const company = await ctx.db.companySettings.findFirst();
+  const bytes = await renderVoucher(view, {
+    name: company?.name ?? "Travel agency",
+    address: company?.address ?? undefined,
+    phone: company?.phone ?? undefined,
+    email: company?.email ?? undefined,
+  });
+  void recordAudit({ tenantId: ctx.tenantId, userId: ctx.userId, action: "booking.agency_voucher_downloaded", entity: "Booking", entityId: id });
+  return { reference: view.reference, bytes };
 }

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Own voucher PDF
+- `GET /api/bookings/[id]/voucher?type=agency` renders the agency's own voucher from the stored booking (no supplier call): agency name and contact, our reference, the supplier's booking number and status word-for-word, tour, option, date, time, guests, lead guest, the supplier's cancellation tiers, a "TEST BOOKING, not valid for travel" stamp for sandbox bookings, and a note that the supplier's own voucher is the one the supplier recognises. Only for bookings the supplier has confirmed. The supplier's voucher download is unchanged. Unit tests.
+
+### Staging environment and uptime monitoring
+- Git branch `staging` + Neon branch `staging` + Preview variables on Vercel scoped to that branch (own database and secrets, live booking off). Steps for using it and for a free uptime monitor on `/api/health` are in CLOUD_DEPLOYMENT_GUIDE.md.
+
 ### Designer polish
 - **Drag and drop** stops within a day or onto another day (same validated `move_item` patch as the arrows, which stay for keyboard use). A browser E2E drags a stop and checks the saved order; it caught a real timing bug (drag state read before re-render), fixed with a ref.
 - **Category icons** next to each stop (decorative; the category name is still printed).

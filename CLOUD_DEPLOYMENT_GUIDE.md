@@ -12,6 +12,24 @@
 
 Not provided: Redis (not needed any more: rate limits live in Postgres), error reporting, log shipping, uptime monitoring, background workers, document storage, CDN rules. See "Still needed" below.
 
+## Staging (try changes before production)
+
+| Piece | Where |
+| --- | --- |
+| Branch | git branch `staging` (Vercel builds every push to it as a **Preview** deployment with its own URL) |
+| Database | Neon branch `staging` (own data, own users; only the 4 standard plans are seeded). Production uses Supabase and is never touched by staging |
+| Secrets | Preview variables scoped to the `staging` branch: its own `DATABASE_URL`, `AUTH_SECRET`, `ENCRYPTION_KEY`. `TRAVELDESK_ALLOW_LIVE_BOOKING=false`. Supplier, map and AI keys are the same ones production uses, so staging searches use the same quotas |
+
+How to use it: `git push origin my-change:staging`, open the Preview URL Vercel prints (Deployments tab), sign up a fresh agency there, try the change, then merge to `main`. Run new migrations against staging first: `DATABASE_URL_UNPOOLED=<staging direct url> npx prisma migrate deploy` (get the URL with `neon connection-string staging`). Reset it any time by deleting and re-creating the Neon branch from `e2e`. Vercel may ask visitors to sign in to preview deployments (Deployment Protection); that is a Vercel setting, not the app.
+
+## Uptime monitoring (free, 5 minutes)
+
+1. Create a free account at UptimeRobot (or Better Stack, Freshping).
+2. Add a monitor: type **HTTP(s)**, URL `https://<your-domain>/api/health`, interval 5 minutes.
+3. Under advanced settings choose "keyword" monitoring and require the text `"status":"ok"`. `/api/health` answers HTTP 503 when the database is down and `"degraded"` when configuration is wrong, so a keyword check catches both.
+4. Add your email (and phone) as the alert contact. Do the same for the staging URL if you want.
+5. After the first alert, open **/admin/errors** (platform admin) to see what the app recorded.
+
 ## Environment variables
 
 `.env.example` is the full list. The ones that matter most (a wrong value here has caused real outages):

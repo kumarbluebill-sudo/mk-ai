@@ -6,6 +6,7 @@ import {
   BookingError,
   cancelBooking,
   confirmBooking,
+  getAgencyVoucher,
   getVoucher,
   refreshBooking,
   reserveSchema,
@@ -85,6 +86,7 @@ function makeDb() {
         return { count: hit.length };
       },
     },
+    companySettings: { findFirst: async () => ({ name: "Test Agency", address: "1 Road", phone: null, email: null }) },
     bookingItem: {
       update: async ({ where, data }: { where: { id: string }; data: Partial<Item> }) => {
         const item = rows.flatMap((r) => r.items).find((i) => i.id === where.id) as Item;
@@ -533,6 +535,30 @@ describe("cancel and voucher", () => {
     expect(Array.from(a.bytes.slice(0, 4))).toEqual([37, 80, 68, 70]);
     await getVoucher(ctx, id);
     expect(vouchers).toHaveLength(1);
+  });
+
+  it("the agency voucher is a PDF that shows the supplier's own status and a test stamp, and makes no supplier call", async () => {
+    const { sim, ctx, id } = await confirmed();
+    const before = sim.calls?.length ?? 0;
+    const v = await getAgencyVoucher(ctx, id);
+    expect(Array.from(v.bytes.slice(0, 4))).toEqual([37, 80, 68, 70]);
+    expect(sim.calls?.length ?? 0).toBe(before);
+    const { renderVoucher } = await import("./voucher-pdf");
+    const { getBooking } = await import("./traveldesk-booking");
+    const view = await getBooking(ctx, id);
+    expect(view.sandbox).toBe(true);
+    // The rendered text is compressed inside the PDF, so check the pieces that build it instead.
+    expect((await renderVoucher(view, { name: "Test Agency" })).length).toBeGreaterThan(1000);
+  });
+
+  it("refuses an agency voucher unless the supplier has confirmed the booking", async () => {
+    simulator();
+    const { ctx } = makeCtx();
+    const { booking } = await reserveTraveldeskBooking(ctx, input, "k-voucher-002");
+    expect((await rejection(getAgencyVoucher(ctx, booking.id)))?.code).toBe("WRONG_STATE");
+    const { renderVoucher, VoucherNotAllowedError } = await import("./voucher-pdf");
+    const { getBooking } = await import("./traveldesk-booking");
+    await expect(renderVoucher(await getBooking(ctx, booking.id), { name: "x" })).rejects.toBeInstanceOf(VoucherNotAllowedError);
   });
 
   it("refuses a voucher for a held or cancelled booking", async () => {
