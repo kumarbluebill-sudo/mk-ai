@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Book from a trip
+- Traveldesk items in the designer have a **Book** button that opens `/bookings/new` with that tour and the day's date chosen. Only a plain numeric tour id and a valid date are accepted from the link. Availability, price and slots are still checked with the supplier before anything is reserved; nothing is booked from the link itself. Viator items have no booking flow yet, so they get no button. E2E covers it.
+
 ### CSP with per-request script nonces
 - `src/proxy.ts` now creates a fresh nonce for every page request and sets the Content-Security-Policy (`src/server/csp.ts`): `script-src 'self' 'nonce-…' 'strict-dynamic'`, **no `unsafe-inline` for scripts**. Next.js stamps the nonce on its own scripts. Injected inline handlers and parser-inserted scripts are refused (browser E2E test). Styles still allow inline (React style attributes). The root layout is `force-dynamic`, so every page is rendered per request (the login page is no longer pre-built static HTML). E2E 28/28 including the offline-page and CSP-violation tests.
 

@@ -54,12 +54,19 @@ function tomorrow(): string {
   return d.toISOString().slice(0, 10);
 }
 
-export default function NewBooking() {
+/** A tour chosen from a trip item. The price and availability are always re-checked with the supplier. */
+export interface Prefill {
+  tourId: string;
+  title: string;
+  date: string | null;
+}
+
+export default function NewBooking({ prefill = null }: { prefill?: Prefill | null }) {
   const router = useRouter();
   const [keyword, setKeyword] = useState("dubai");
   const [tours, setTours] = useState<TourHit[] | null>(null);
-  const [tour, setTour] = useState<TourHit | null>(null);
-  const [date, setDate] = useState(tomorrow);
+  const [tour, setTour] = useState<TourHit | null>(prefill ? { id: prefill.tourId, title: prefill.title, pricePerPerson: null, currency: null } : null);
+  const [date, setDate] = useState(() => (prefill?.date && prefill.date >= tomorrow() ? prefill.date : tomorrow()));
   const [adults, setAdults] = useState("2");
   const [children, setChildren] = useState("0");
   const [infants, setInfants] = useState("0");
@@ -212,6 +219,10 @@ export default function NewBooking() {
       {tour && (
         <section aria-label="Date and guests" className="space-y-2 rounded border p-3">
           <h2 className="font-medium">2. Date and guests</h2>
+          <p className="text-sm">
+            <strong>{tour.title}</strong>
+            {prefill?.tourId === tour.id && <span className="ml-2 text-xs text-gray-600">chosen from your trip. Check availability to see today&apos;s price and slots.</span>}
+          </p>
           <form onSubmit={checkAvailability} className="grid gap-2 sm:grid-cols-5">
             <input type="date" required min={tomorrow()} className={`${input} sm:col-span-2`} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
             <label className="text-xs">Adults<input className={`${input} w-full`} inputMode="numeric" value={adults} onChange={(e) => setAdults(e.target.value)} /></label>

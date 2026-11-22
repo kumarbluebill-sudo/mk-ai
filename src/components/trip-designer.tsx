@@ -8,6 +8,11 @@ import type { DayRoute } from "@/server/travel/geo";
 import type { Itinerary, ItineraryDay, ItineraryItem, ItineraryPatch } from "@/server/travel/itinerary";
 
 // Leaflet touches `window`, so it must only load in the browser.
+/** A Traveldesk tour that can be booked from the booking page (its product code is the numeric tour id). */
+function bookableTourId(item: ItineraryItem): string | null {
+  return item.supplier === "traveldesk" && item.productCode && /^\d{1,10}$/.test(item.productCode) ? item.productCode : null;
+}
+
 const TripMap = dynamic(() => import("./trip-map"), { ssr: false });
 
 type Category = ItineraryItem["category"];
@@ -435,6 +440,15 @@ export default function TripDesigner({ conversationId }: { conversationId: strin
                             <option value="">Move to…</option>
                             {itinerary.days.filter((x) => x.dayNumber !== d.dayNumber).map((x) => <option key={x.dayNumber} value={x.dayNumber}>Day {x.dayNumber}</option>)}
                           </select>
+                          {bookableTourId(item) && (
+                            <Link
+                              href={`/bookings/new?${new URLSearchParams({ tourId: bookableTourId(item) as string, title: item.title, ...(d.date ? { date: d.date } : {}) })}`}
+                              title="Opens the booking page with this tour chosen. Availability and price are checked again with the supplier."
+                              className="rounded border border-blue-600 px-2 text-blue-700"
+                            >
+                              Book
+                            </Link>
+                          )}
                           <button onClick={() => setEditing(item.id)} className="rounded border px-2">Edit</button>
                           <button disabled={busy} onClick={() => void send([{ op: "remove_item", itemId: item.id }])} className="rounded border px-2 text-red-700">Remove</button>
                         </div>
