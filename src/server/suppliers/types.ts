@@ -51,6 +51,8 @@ export interface InventorySearchRequest {
 export type SupplierStatus =
   | "OK"
   | "NOT_CONFIGURED"
+  /** Switched off by the platform admin; not searched, not an error. */
+  | "DISABLED"
   | "UNSUPPORTED"
   | "TIMEOUT"
   | "ERROR";

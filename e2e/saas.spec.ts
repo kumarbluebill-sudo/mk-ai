@@ -78,6 +78,8 @@ test.describe.serial("plans, team and platform admin", () => {
     expect((await owner.ctx.get("/api/admin/system")).status()).toBe(403);
     expect((await owner.ctx.get("/api/admin/errors")).status()).toBe(403);
     expect((await owner.ctx.get("/api/admin/ai")).status()).toBe(403);
+    expect((await owner.ctx.get("/api/admin/suppliers")).status()).toBe(403);
+    expect((await owner.ctx.patch("/api/admin/suppliers/viator", { data: { enabled: false } })).status()).toBe(403);
     expect((await owner.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "m", apiKey: "gsk_ownerownerowner0000" } })).status()).toBe(403);
     expect((await (await api()).get("/api/admin/ai")).status()).toBe(401);
 
@@ -112,6 +114,14 @@ test.describe.serial("plans, team and platform admin", () => {
     expect((await admin.ctx.post("/api/admin/ai/nonsense/test")).status()).toBe(404);
     expect((await admin.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "m" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
     expect((await admin.ctx.delete("/api/admin/ai/groq")).status()).toBe(200);
+    // Supplier switches: unknown suppliers 404, a cross-origin change is refused, and the list never carries credentials.
+    const sup = await admin.ctx.get("/api/admin/suppliers");
+    expect(sup.status()).toBe(200);
+    const supText = await sup.text();
+    expect(Object.keys(JSON.parse(supText).suppliers[0]).sort()).toEqual(["categories", "configured", "displayName", "enabled", "environment", "id", "reason", "stats"]);
+    expect(JSON.parse(supText).suppliers.map((s: { id: string }) => s.id)).toEqual(expect.arrayContaining(["viator", "traveldesk", "yatra", "klook"]));
+    expect((await admin.ctx.patch("/api/admin/suppliers/made-up", { data: { enabled: false } })).status()).toBe(404);
+    expect((await admin.ctx.patch("/api/admin/suppliers/viator", { data: { enabled: false }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
     // Cross-origin writes are blocked even for an administrator.
     expect((await admin.ctx.patch(`/api/admin/tenants/${tenantId}`, { data: { status: "ACTIVE" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
   });

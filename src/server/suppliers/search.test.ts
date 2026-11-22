@@ -191,3 +191,52 @@ describe("viator normalisation", () => {
     expect(normaliseViatorActivity({ ...activity, price: 0 }, "production", "t").price).toBeNull();
   });
 });
+
+describe("admin switches and call counting", () => {
+  const ok = (id: string) => fake(id, async () => ({ items: [item(id, "1")], environment: "production" }));
+
+  it("does not ask a switched-off supplier, reports it as DISABLED, and still searches the others", async () => {
+    const off = vi.fn(async () => ({ items: [item("off", "1")], environment: "production" }));
+    const r = await searchInventory(req, { adapters: [fake("off", off), ok("on")], disabled: new Set(["off"]) });
+    expect(off).not.toHaveBeenCalled();
+    expect(r.suppliers.find((s) => s.supplier === "off")).toMatchObject({ status: "DISABLED" });
+    expect(r.suppliers.find((s) => s.supplier === "on")?.status).toBe("OK");
+    expect(r.items.map((i) => i.supplier)).toEqual(["on"]);
+  });
+
+  it("counts real requests (ok, error, timeout) but not cached, disabled, unconfigured or unsupported suppliers", async () => {
+    const seen: string[] = [];
+    const onOutcome = (o: { supplier: string; status: string }) => seen.push(`${o.supplier}:${o.status}`);
+    const boom = fake("boom", async () => {
+      throw new Error("upstream secret detail");
+    });
+    const slow = fake("slow", () => new Promise(() => undefined));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await searchInventory(req, {
+      adapters: [
+        ok("fine"),
+        boom,
+        slow,
+        fake("nokey", async () => ({ items: [], environment: "x" }), { isConfigured: () => false }),
+        fake("hotels", async () => ({ items: [], environment: "x" }), { categories: ["hotel"] }),
+        fake("off", async () => ({ items: [], environment: "x" })),
+      ],
+      timeoutMs: 30,
+      disabled: new Set(["off"]),
+      onOutcome,
+    });
+    expect(seen.sort()).toEqual(["boom:ERROR", "fine:OK", "slow:TIMEOUT"]);
+    await searchInventory(req, { adapters: [ok("fine")], onOutcome });
+    expect(seen.filter((x) => x === "fine:OK")).toHaveLength(1); // the second answer came from the cache
+  });
+
+  it("a failing counter never breaks a search", async () => {
+    const r = await searchInventory(req, {
+      adapters: [ok("a")],
+      onOutcome: () => {
+        throw new Error("db down");
+      },
+    });
+    expect(r.items).toHaveLength(1);
+  });
+});

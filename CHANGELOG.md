@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Supplier admin (/admin/suppliers)
+- Per supplier: connected or not (with the reason), sandbox or production API, an **on/off switch** (honoured by every search within about 30 seconds; a switched-off supplier is reported as DISABLED, never searched), a **Test connection** button (one real search, nothing stored), and 30-day health from a new request log (answered %, timeouts, errors, average speed, latest problem with a generic message). Only suppliers that were really asked are counted (not cached, disabled, unsupported or not-connected ones). Migration `supplier_settings_calls` (new tables only).
+- **Credentials stay environment variables.** The Viator and Traveldesk clients read them synchronously and one platform key set is how the product works; the page shows connection state only, never a key. Storing keys in the database becomes worth it when agencies bring their own supplier accounts, and needs those clients reworked first.
+- Yatra and Klook remain "not connected" (no official API documentation or credentials). `src/server/suppliers/products.ts` defines the normalised flight and hotel shapes (no supplier produces them yet; every uncertain field optional, revalidation required).
+
 ### AI provider management (/admin/ai)
 - Eight providers behind one interface: Anthropic, OpenAI, Google Gemini, Mistral, DeepSeek, Groq, OpenRouter and Ollama / local. All but Anthropic use their documented OpenAI-compatible endpoints through one adapter with a per-provider base URL and token-limit field (`src/server/ai/catalog.ts`). **Only Anthropic and OpenAI have been used with real keys in this project; the others are covered by request-shape tests (URL, headers, body) and become "working" only after "Test connection" succeeds with your key.**
 - The super admin sets provider, model, base URL, key, enabled flag, order (primary then fallbacks) and optional prices in the new page. Keys are AES-encrypted in `AiProviderConfig`, only the last 4 characters are ever shown, and error messages are scrubbed of keys. Environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) still work and run after the saved providers; if the settings table cannot be read the chat falls back to them. Base URLs are validated (https for remote hosts, no credentials in URLs, no metadata addresses, localhost only for Ollama).

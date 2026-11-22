@@ -18,6 +18,10 @@ export interface SearchOptions {
   maxPriceMinor?: number;
   /** Set false to bypass the short-lived cache (e.g. right before presenting a price). */
   useCache?: boolean;
+  /** Supplier ids switched off by the platform admin (see settings.ts). They are reported as DISABLED, not searched. */
+  disabled?: ReadonlySet<string>;
+  /** Called once per supplier that was actually asked, so calls can be counted. Must not throw. */
+  onOutcome?: (outcome: SupplierOutcome, category: InventorySearchRequest["category"]) => void;
 }
 
 export interface SearchResult {
@@ -60,16 +64,29 @@ async function runAdapter(
   adapter: SupplierAdapter,
   request: InventorySearchRequest,
   timeoutMs: number,
-  useCache: boolean
+  useCache: boolean,
+  disabled: ReadonlySet<string> | undefined,
+  onOutcome: SearchOptions["onOutcome"]
 ): Promise<{ outcome: SupplierOutcome; items: InventoryItem[] }> {
   const started = Date.now();
-  const done = (outcome: Omit<SupplierOutcome, "supplier" | "latencyMs">, items: InventoryItem[] = []) => ({
-    outcome: { supplier: adapter.id, latencyMs: Date.now() - started, ...outcome },
-    items,
-  });
+  const done = (outcome: Omit<SupplierOutcome, "supplier" | "latencyMs">, items: InventoryItem[] = []) => {
+    const full: SupplierOutcome = { supplier: adapter.id, latencyMs: Date.now() - started, ...outcome };
+    // Only suppliers that were really asked are counted; "not connected" and "switched off" are not calls.
+    if (onOutcome && ["OK", "TIMEOUT", "ERROR"].includes(full.status) && !full.cached) {
+      try {
+        onOutcome(full, request.category);
+      } catch {
+        // counting must never break a search
+      }
+    }
+    return { outcome: full, items };
+  };
 
   if (!adapter.categories.includes(request.category)) {
     return done({ status: "UNSUPPORTED", itemCount: 0, message: `${adapter.displayName} does not sell ${request.category}.` });
+  }
+  if (disabled?.has(adapter.id)) {
+    return done({ status: "DISABLED", itemCount: 0, message: `${adapter.displayName} is switched off by the administrator.` });
   }
   if (!adapter.isConfigured()) {
     return done({ status: "NOT_CONFIGURED", itemCount: 0, message: adapter.notConfiguredReason() });
@@ -146,7 +163,7 @@ export async function searchInventory(
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   const results = await Promise.all(
-    adapters.map((a) => runAdapter(a, request, timeoutMs, options.useCache ?? true))
+    adapters.map((a) => runAdapter(a, request, timeoutMs, options.useCache ?? true, options.disabled, options.onOutcome))
   );
 
   let items = results.flatMap((r) => r.items);

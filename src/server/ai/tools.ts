@@ -17,6 +17,7 @@ import {
   type Itinerary,
 } from "@/server/travel/itinerary";
 import { calculatePackagePrice, PricingError } from "@/server/travel/pricing";
+import { supplierRuntime } from "@/server/suppliers/settings";
 import type { ToolSpec } from "./types";
 
 /** Per-conversation working memory persisted in Conversation.state. */
@@ -176,9 +177,10 @@ export const TOOLS: ToolDefinition[] = [
         {
           sort: input.sort,
           maxPriceMinor: input.maxPricePerPerson ? Math.round(input.maxPricePerPerson * 100) : undefined,
+          ...(await supplierRuntime()),
         }
       );
-      const anyConfigured = result.suppliers.some((s) => s.status !== "NOT_CONFIGURED" && s.status !== "UNSUPPORTED");
+      const anyConfigured = result.suppliers.some((s) => s.status !== "NOT_CONFIGURED" && s.status !== "UNSUPPORTED" && s.status !== "DISABLED");
       if (!anyConfigured) {
         return { ok: false, error: "SUPPLIER_NOT_CONFIGURED", suppliers: result.suppliers };
       }

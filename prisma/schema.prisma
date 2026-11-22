@@ -682,3 +682,25 @@ model AiProviderConfig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
+
+/// Platform-level switch per supplier adapter (adapter id such as "viator"). No row means enabled.
+model SupplierSetting {
+  supplierId String   @id
+  enabled    Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+}
+
+/// One row per real supplier request made by a search (not for cached answers or suppliers that were not asked).
+model SupplierCall {
+  id        String   @id @default(cuid())
+  supplier  String
+  category  String
+  status    String
+  latencyMs Int
+  itemCount Int      @default(0)
+  /// Safe, generic text only (never upstream bodies or keys).
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@index([supplier, createdAt])
+}

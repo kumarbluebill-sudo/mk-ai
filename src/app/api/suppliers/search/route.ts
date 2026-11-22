@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { guardRoute } from "@/server/tenant-context";
 import { searchInventory } from "@/server/suppliers/search";
+import { supplierRuntime } from "@/server/suppliers/settings";
 
 const querySchema = z.object({
   category: z.enum(["activity", "hotel", "flight", "transfer", "package"]).default("activity"),
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
       sort: q.sort,
       maxPriceMinor: q.maxPrice ? Math.round(q.maxPrice * 100) : undefined,
       useCache: q.fresh !== "true",
+      ...(await supplierRuntime()),
     }
   );
   return NextResponse.json({ success: true, ...result });
