@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### CSP with per-request script nonces
+- `src/proxy.ts` now creates a fresh nonce for every page request and sets the Content-Security-Policy (`src/server/csp.ts`): `script-src 'self' 'nonce-…' 'strict-dynamic'`, **no `unsafe-inline` for scripts**. Next.js stamps the nonce on its own scripts. Injected inline handlers and parser-inserted scripts are refused (browser E2E test). Styles still allow inline (React style attributes). The root layout is `force-dynamic`, so every page is rendered per request (the login page is no longer pre-built static HTML). E2E 28/28 including the offline-page and CSP-violation tests.
+
 ### Optimise a day by road
 - "Optimise order" now asks the Mapbox Optimization API (`POST /api/itineraries/[id]/optimize`) for the best order by road time, applied through a new validated `reorder_day` patch (must list each located stop exactly once). The **first and last stops stay fixed**: a live check showed the API rejects open-ended trips (`destination=any` is `NotImplemented`), and it needs at least 4 located stops and at most 12. When road data is unavailable, too few stops, or any error, the designer falls back to the old straight-line order and **says so** on screen (an estimate). Another agency's trip answers 404. Unit tests cover parsing, rejected answers and the patch; verified against the live API.
 
