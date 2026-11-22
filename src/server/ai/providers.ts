@@ -1,3 +1,4 @@
+import { resolveProviders } from "./config";
 import { AnthropicProvider } from "./anthropic";
 import { OpenAIProvider } from "./openai";
 import { AiNotConfiguredError, type AiProvider, type CompletionRequest, type CompletionResponse } from "./types";
@@ -28,20 +29,34 @@ export function getConfiguredProviders(env: NodeJS.ProcessEnv = process.env): Ai
 }
 
 /** Tries each provider in order; the last error is thrown if all fail. */
+export interface FallbackHooks {
+  /** Called for every provider that failed, so the failure can be counted. */
+  onFailure?: (provider: AiProvider, error: unknown, latencyMs: number) => void;
+}
+
 export async function completeWithFallback(
   providers: AiProvider[],
-  request: CompletionRequest
+  request: CompletionRequest,
+  hooks: FallbackHooks = {}
 ): Promise<CompletionResponse> {
   if (providers.length === 0) throw new AiNotConfiguredError();
   let lastError: unknown;
   for (const provider of providers) {
+    const started = Date.now();
     try {
-      return await provider.complete(request);
+      const response = await provider.complete(request);
+      return { ...response, latencyMs: Date.now() - started };
     } catch (error) {
       if (request.signal?.aborted) throw error;
+      hooks.onFailure?.(provider, error, Date.now() - started);
       lastError = error;
       console.error(`AI provider ${provider.name} failed:`, error instanceof Error ? error.message : "unknown error");
     }
   }
   throw lastError;
+}
+
+/** Providers for a chat request: the ones saved in the admin AI page first, then environment-variable ones. */
+export function resolveAiProviders(): Promise<AiProvider[]> {
+  return resolveProviders(getConfiguredProviders);
 }

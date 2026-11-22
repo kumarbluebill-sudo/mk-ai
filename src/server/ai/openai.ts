@@ -29,24 +29,36 @@ export function toOpenAIMessages(system: string, messages: ChatMessage[]): OpenA
   return out;
 }
 
-export class OpenAIProvider implements AiProvider {
-  readonly name = "openai";
-  private client: OpenAI;
+export interface OpenAICompatibleOptions {
+  /** Provider id shown in usage records ("openai", "groq", ...). */
+  name?: string;
+  baseURL?: string;
+  tokenParam?: "max_completion_tokens" | "max_tokens";
+  timeoutMs?: number;
+}
 
-  constructor(apiKey: string, readonly model: string) {
-    this.client = new OpenAI({ apiKey });
+export class OpenAIProvider implements AiProvider {
+  readonly name: string;
+  private client: OpenAI;
+  private tokenParam: "max_completion_tokens" | "max_tokens";
+
+  constructor(apiKey: string, readonly model: string, options: OpenAICompatibleOptions = {}) {
+    this.name = options.name ?? "openai";
+    this.tokenParam = options.tokenParam ?? "max_completion_tokens";
+    // Local models (Ollama) need no key, but the SDK insists on a non-empty value.
+    this.client = new OpenAI({ apiKey: apiKey || "not-needed", baseURL: options.baseURL, timeout: options.timeoutMs ?? 60_000, maxRetries: 1 });
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const response = await this.client.chat.completions.create(
       {
         model: this.model,
-        max_completion_tokens: request.maxTokens,
+        ...(this.tokenParam === "max_tokens" ? { max_tokens: request.maxTokens } : { max_completion_tokens: request.maxTokens }),
         messages: toOpenAIMessages(request.system, request.messages),
-        tools: request.tools.map((t) => ({
-          type: "function" as const,
-          function: { name: t.name, description: t.description, parameters: t.inputSchema },
-        })),
+        // Some providers reject an empty tools list, so it is only sent when there are tools.
+        ...(request.tools.length
+          ? { tools: request.tools.map((t) => ({ type: "function" as const, function: { name: t.name, description: t.description, parameters: t.inputSchema } })) }
+          : {}),
       },
       { signal: request.signal }
     );

@@ -30,18 +30,22 @@ export interface CompletionResponse {
   usage: { inputTokens: number; outputTokens: number };
   provider: string;
   model: string;
+  /** Set by completeWithFallback: how long the answering provider took. */
+  latencyMs?: number;
 }
 
 /** Provider-independent LLM interface. Adapters must never log prompts or keys. */
 export interface AiProvider {
   readonly name: string;
   readonly model: string;
+  /** Admin-entered prices per million tokens, used only for cost estimates. */
+  readonly pricing?: { inputPerM: number; outputPerM: number };
   complete(request: CompletionRequest): Promise<CompletionResponse>;
 }
 
 export class AiNotConfiguredError extends Error {
   constructor() {
-    super("No AI provider is configured (set ANTHROPIC_API_KEY or OPENAI_API_KEY)");
+    super("No AI provider is configured (add one in the admin AI page, or set ANTHROPIC_API_KEY or OPENAI_API_KEY)");
     this.name = "AiNotConfiguredError";
   }
 }

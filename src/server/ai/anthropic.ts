@@ -50,11 +50,9 @@ export class AnthropicProvider implements AiProvider {
         max_tokens: request.maxTokens,
         system: request.system,
         messages: toAnthropicMessages(request.messages),
-        tools: request.tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.inputSchema as Anthropic.Messages.Tool.InputSchema,
-        })),
+        ...(request.tools.length
+          ? { tools: request.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Messages.Tool.InputSchema })) }
+          : {}),
       },
       { signal: request.signal }
     );

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-export function AdminNav({ current }: { current: "tenants" | "plans" | "audit" | "errors" | "system" }) {
+export function AdminNav({ current }: { current: "tenants" | "plans" | "ai" | "audit" | "errors" | "system" }) {
   const link = (href: string, label: string, key: string) => (
     <Link href={href} aria-current={current === key ? "page" : undefined} className={`rounded border px-3 py-1 text-sm ${current === key ? "bg-blue-600 text-white" : ""}`}>
       {label}
@@ -15,6 +15,7 @@ export function AdminNav({ current }: { current: "tenants" | "plans" | "audit" |
       <nav aria-label="Admin sections" className="flex gap-2">
         {link("/admin", "Tenants", "tenants")}
         {link("/admin/plans", "Plans", "plans")}
+        {link("/admin/ai", "AI providers", "ai")}
         {link("/admin/audit", "Audit log", "audit")}
         {link("/admin/errors", "Errors", "errors")}
         {link("/admin/system", "System", "system")}

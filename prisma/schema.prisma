@@ -193,11 +193,17 @@ model AiUsage {
   model        String
   inputTokens  Int      @default(0)
   outputTokens Int      @default(0)
+  /// Time the provider took to answer, and whether it answered (failed attempts are recorded with zero tokens).
+  latencyMs    Int?
+  ok           Boolean  @default(true)
+  /// Estimated cost in millionths of the price currency, from the prices the admin entered for the provider at that time.
+  costMicros   Int?
   createdAt    DateTime @default(now())
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
+  @@index([provider, createdAt])
 }
 
 model Message {
@@ -652,4 +658,27 @@ model ErrorLog {
   resolvedAt  DateTime?
 
   @@index([lastSeen])
+}
+
+/// Platform-level AI provider settings, managed by the super admin (not tenant data). The API key is encrypted
+/// (src/server/crypto.ts) and never sent back to a browser.
+model AiProviderConfig {
+  id               String    @id @default(cuid())
+  provider         String    @unique
+  model            String
+  baseUrl          String?
+  encryptedKey     String?
+  keyLast4         String?
+  enabled          Boolean   @default(true)
+  /// Lower runs first; the first enabled provider is the primary, the next ones are fallbacks.
+  priority         Int       @default(100)
+  /// Optional prices (per million tokens, any one currency) for cost estimates. Never guessed by the app.
+  inputPricePerM   Decimal?  @db.Decimal(12, 4)
+  outputPricePerM  Decimal?  @db.Decimal(12, 4)
+  lastCheckAt      DateTime?
+  lastCheckOk      Boolean?
+  lastCheckMessage String?
+  lastLatencyMs    Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }

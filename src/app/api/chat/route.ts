@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runAgent, type AgentEvent } from "@/server/ai/agent";
 import { generateFallbackResponse } from "@/server/ai/fallback";
-import { getConfiguredProviders } from "@/server/ai/providers";
+import { resolveAiProviders } from "@/server/ai/providers";
 import { emptyState, type ConversationState } from "@/server/ai/tools";
 import type { ChatMessage } from "@/server/ai/types";
 import { assertFeature, assertWithinLimit } from "@/server/billing/limits";
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       send({ type: "conversation", id: conversationId });
 
       try {
-        const providers = getConfiguredProviders();
+        const providers = await resolveAiProviders();
         let reply: string;
         let mode: "ai" | "scripted-fallback";
 

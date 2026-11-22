@@ -30,6 +30,16 @@ describe("completeWithFallback", () => {
   const ok = { text: "hi", toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, provider: "b", model: "m" };
   const req = { system: "s", messages: [], tools: [], maxTokens: 10 };
 
+  it("reports each failed provider with its timing and stamps the answer with its latency", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const a = { name: "a", model: "m", complete: vi.fn().mockRejectedValue(new Error("boom")) } as unknown as AiProvider;
+    const b = { name: "b", model: "m", complete: vi.fn().mockResolvedValue(ok) } as unknown as AiProvider;
+    const failed: string[] = [];
+    const out = await completeWithFallback([a, b], req, { onFailure: (p) => failed.push(p.name) });
+    expect(failed).toEqual(["a"]);
+    expect(typeof out.latencyMs).toBe("number");
+  });
+
   it("throws AiNotConfiguredError with no providers", async () => {
     await expect(completeWithFallback([], req)).rejects.toThrow(AiNotConfiguredError);
   });

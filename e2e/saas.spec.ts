@@ -77,6 +77,9 @@ test.describe.serial("plans, team and platform admin", () => {
     expect((await (await api()).get("/api/admin/tenants")).status()).toBe(401);
     expect((await owner.ctx.get("/api/admin/system")).status()).toBe(403);
     expect((await owner.ctx.get("/api/admin/errors")).status()).toBe(403);
+    expect((await owner.ctx.get("/api/admin/ai")).status()).toBe(403);
+    expect((await owner.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "m", apiKey: "gsk_ownerownerowner0000" } })).status()).toBe(403);
+    expect((await (await api()).get("/api/admin/ai")).status()).toBe(401);
 
     // An administrator who has not turned on two-factor is refused too.
     const weak = await newAgency("weakadmin");
@@ -96,6 +99,19 @@ test.describe.serial("plans, team and platform admin", () => {
     expect(sys.database.ok).toBe(true);
     const errs = await json<{ errors: unknown[] }>(await admin.ctx.get("/api/admin/errors"));
     expect(Array.isArray(errs.errors)).toBe(true);
+    // AI providers: a key is stored but never comes back, and is removed again at the end.
+    const secret = "gsk_e2esecretvalue0000abcd";
+    const saved = await admin.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "llama-3.3-70b-versatile", apiKey: secret, enabled: false, priority: 50 } });
+    expect(saved.status()).toBe(200);
+    expect(await saved.text()).not.toContain(secret);
+    const listing = await admin.ctx.get("/api/admin/ai");
+    const listingText = await listing.text();
+    expect(listingText).not.toContain(secret);
+    expect(JSON.parse(listingText).providers.find((p: { provider: string }) => p.provider === "groq")).toMatchObject({ hasKey: true, keyLast4: "abcd", enabled: false });
+    expect((await admin.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "m", baseUrl: "http://169.254.169.254/x" } })).status()).toBe(400);
+    expect((await admin.ctx.post("/api/admin/ai/nonsense/test")).status()).toBe(404);
+    expect((await admin.ctx.post("/api/admin/ai", { data: { provider: "groq", model: "m" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
+    expect((await admin.ctx.delete("/api/admin/ai/groq")).status()).toBe(200);
     // Cross-origin writes are blocked even for an administrator.
     expect((await admin.ctx.patch(`/api/admin/tenants/${tenantId}`, { data: { status: "ACTIVE" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
   });

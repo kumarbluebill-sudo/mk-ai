@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### AI provider management (/admin/ai)
+- Eight providers behind one interface: Anthropic, OpenAI, Google Gemini, Mistral, DeepSeek, Groq, OpenRouter and Ollama / local. All but Anthropic use their documented OpenAI-compatible endpoints through one adapter with a per-provider base URL and token-limit field (`src/server/ai/catalog.ts`). **Only Anthropic and OpenAI have been used with real keys in this project; the others are covered by request-shape tests (URL, headers, body) and become "working" only after "Test connection" succeeds with your key.**
+- The super admin sets provider, model, base URL, key, enabled flag, order (primary then fallbacks) and optional prices in the new page. Keys are AES-encrypted in `AiProviderConfig`, only the last 4 characters are ever shown, and error messages are scrubbed of keys. Environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) still work and run after the saved providers; if the settings table cannot be read the chat falls back to them. Base URLs are validated (https for remote hosts, no credentials in URLs, no metadata addresses, localhost only for Ollama).
+- Usage records now carry latency, success/failure and an estimated cost (only when you enter prices; never guessed). Failed provider attempts are counted. The page shows 30-day calls, failures, tokens, average speed and estimated cost per provider and each provider's last health check.
+- Adapters no longer send an empty tools list (some providers reject it). Migration `ai_provider_config` (additive). Unit 265, E2E 30/30.
+
 ### Own voucher PDF
 - `GET /api/bookings/[id]/voucher?type=agency` renders the agency's own voucher from the stored booking (no supplier call): agency name and contact, our reference, the supplier's booking number and status word-for-word, tour, option, date, time, guests, lead guest, the supplier's cancellation tiers, a "TEST BOOKING, not valid for travel" stamp for sandbox bookings, and a note that the supplier's own voucher is the one the supplier recognises. Only for bookings the supplier has confirmed. The supplier's voucher download is unchanged. Unit tests.
 

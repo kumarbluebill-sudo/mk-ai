@@ -1,4 +1,5 @@
-import { completeWithFallback } from "./providers";
+import { estimateCostMicros } from "./config";
+import { completeWithFallback, type FallbackHooks } from "./providers";
 import { executeTool, getToolSpecs, serializeResult, type ToolContext } from "./tools";
 import type { AiProvider, ChatMessage, CompletionRequest, CompletionResponse } from "./types";
 
@@ -40,7 +41,7 @@ export interface AgentOptions {
   signal?: AbortSignal;
   maxSteps?: number;
   /** Injectable for tests. */
-  complete?: (providers: AiProvider[], request: CompletionRequest) => Promise<CompletionResponse>;
+  complete?: (providers: AiProvider[], request: CompletionRequest, hooks?: FallbackHooks) => Promise<CompletionResponse>;
 }
 
 export interface AgentResult {
@@ -59,13 +60,18 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   for (let step = 1; step <= maxSteps; step++) {
     if (signal?.aborted) throw new Error("Aborted");
 
-    const response = await complete(providers, {
-      system: buildSystemPrompt(),
-      messages,
-      tools,
-      maxTokens: 4096,
-      signal,
-    });
+    const response = await complete(
+      providers,
+      { system: buildSystemPrompt(), messages, tools, maxTokens: 4096, signal },
+      {
+        // A provider that failed is counted too (zero tokens), so the admin page can show error rates.
+        onFailure: (failed, _error, latencyMs) => {
+          ctx.db.aiUsage
+            .create({ data: { tenantId: ctx.tenantId, userId: ctx.userId, provider: failed.name, model: failed.model, inputTokens: 0, outputTokens: 0, latencyMs, ok: false } })
+            .catch(() => undefined);
+        },
+      }
+    );
 
     // Usage accounting must never break the conversation.
     ctx.db.aiUsage
@@ -77,6 +83,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           model: response.model,
           inputTokens: response.usage.inputTokens,
           outputTokens: response.usage.outputTokens,
+          latencyMs: response.latencyMs,
+          ok: true,
+          costMicros: estimateCostMicros(providers.find((p) => p.name === response.provider)?.pricing, response.usage.inputTokens, response.usage.outputTokens),
         },
       })
       .catch((error: unknown) => console.error("AI usage log failed:", error instanceof Error ? error.message : error));
