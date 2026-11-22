@@ -1,7 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { AppNav } from "@/components/app-nav";
 import { InstallPrompt, OfflineBanner, PwaRegister } from "@/components/pwa";
 import "./globals.css";
+
+// Self-hosted at build time by next/font: no request to Google when a page loads.
+const sans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm-sans", display: "swap" });
+const serif = DM_Serif_Display({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-dm-serif", display: "swap" });
 
 export const metadata: Metadata = {
   title: "MK AI Travel — Your next trip, thoughtfully planned",
@@ -24,7 +29,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
       <body>
         <OfflineBanner />
         <AppNav />

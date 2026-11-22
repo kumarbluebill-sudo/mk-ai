@@ -18,6 +18,6 @@ const brand = {
 
 export default {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
-  theme: { extend: { fontFamily: { serif: ["DM Serif Display", "Georgia", "serif"] }, colors: { blue: brand, brand, gold: { 400: "#d4b57a", 500: "#ba9a64", 600: "#9c7f4d" } } } },
+  theme: { extend: { fontFamily: { serif: ["var(--font-dm-serif)", "Georgia", "serif"] }, colors: { blue: brand, brand, gold: { 400: "#d4b57a", 500: "#ba9a64", 600: "#9c7f4d" } } } },
   plugins: [],
 } satisfies Config;

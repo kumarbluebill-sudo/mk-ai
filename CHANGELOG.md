@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Self-hosted fonts
+- DM Sans and DM Serif Display now come from `next/font` (downloaded at build, served from our own domain). Pages no longer contact Google, and the CSP no longer allows fonts.googleapis.com or fonts.gstatic.com. Unit 232, E2E 26/26 (including the CSP-violation browser test) pass.
+
 ### Phase 9: installable app (PWA) and native shell
 - Installable web app: manifest with icons (192, 512, maskable, Apple touch), shortcuts, install prompt, iOS instructions, offline page and offline banner. Service worker stores **nothing that belongs to a user** (only the offline page and public hashed static files); verified in a real browser after a signed-in session.
 - Capacitor Android/iOS shell around the deployed site (`capacitor.config.ts`, `capacitor-web/`). Config loads and `cap add/sync android` succeed. **Not built or run on any device** (no Android SDK); see MOBILE_APP_GUIDE.md for the decisions needed before a store release, including Apple's website-wrapper rule.
