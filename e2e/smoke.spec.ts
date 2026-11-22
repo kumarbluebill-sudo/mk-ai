@@ -6,8 +6,9 @@ test.describe("smoke", () => {
     const ctx = await api();
     const res = await ctx.get("/api/health");
     expect(res.status()).toBe(200);
-    const body = await json<{ status: string; checks: { database: string; configErrors: number; configWarnings: number } }>(res);
+    const body = await json<{ status: string; checks: { database: string; schema: string; configErrors: number; configWarnings: number } }>(res);
     expect(["ok", "degraded"]).toContain(body.status);
+    expect(body.checks.schema).toBe("ok");
     expect(body.checks.database).toBe("ok");
     expect(typeof body.checks.configErrors).toBe("number");
     // Public endpoint: counts only, never variable names or values.

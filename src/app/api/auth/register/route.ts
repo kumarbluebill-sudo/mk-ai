@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { EmailInUseError, registerAgency, registerSchema } from "@/server/auth/register";
+import { isSchemaMismatch, SCHEMA_OUT_OF_DATE_MESSAGE } from "@/server/db-schema";
 import { rateLimit } from "@/server/rate-limit";
 
 export async function POST(request: NextRequest) {
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     console.error("Register error:", error);
+    if (isSchemaMismatch(error)) return NextResponse.json({ error: SCHEMA_OUT_OF_DATE_MESSAGE }, { status: 503 });
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }
