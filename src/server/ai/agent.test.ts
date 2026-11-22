@@ -115,3 +115,13 @@ describe("system prompt", () => {
     expect(p).toMatch(/sandbox/);
   });
 });
+
+describe("buildSystemPrompt tour programme workflow", () => {
+  it("never lets the model invent hotels or assume a tax rate", () => {
+    const prompt = buildSystemPrompt(new Date("2026-11-22"));
+    expect(prompt).toMatch(/NO live hotel inventory/);
+    expect(prompt).toMatch(/Do not invent hotel names/);
+    expect(prompt).toMatch(/never assume a statutory rate/);
+    expect(prompt).toMatch(/check_availability/);
+  });
+});
